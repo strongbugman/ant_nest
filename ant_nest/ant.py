@@ -1,10 +1,11 @@
-from typing import Any, Optional, List, Coroutine
+from typing import Any, Optional, List, Coroutine, Union
 import abc
 import itertools
 import logging
 
 import aiohttp
 from aiohttp.client_reqrep import ClientResponse
+from yarl import URL
 
 from .pipelines import Pipeline, ThingProcessError
 from .things import Request, Response, Item, Things
@@ -18,7 +19,7 @@ class Ant(abc.ABC):
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def request(self, url: str, method='GET', params: Optional[dict]=None, headers: Optional[dict]=None,
+    async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None, headers: Optional[dict]=None,
                       cookies: Optional[dict]=None, data: Optional[Any]=None,
                       proxy: Optional[str]=None) -> Response:
         self.logger.debug('{:s} {:s}'.format(method, url))
@@ -79,7 +80,7 @@ class Ant(abc.ABC):
         return thing
 
     async def _request(self, req: Request) -> Response:
-        kwargs = req.__dict__
+        kwargs = {k: getattr(req, k) for k in req.__slots__}
         cookies = kwargs.pop('cookies')
         async with aiohttp.ClientSession(cookies=cookies) as session:
             async with session.request(**kwargs) as aio_response:
@@ -87,6 +88,6 @@ class Ant(abc.ABC):
         return self._convert_response(aio_response, req)
 
     def _convert_response(self, aio_response: ClientResponse, request: Request) -> Response:
-        return self._response_class(request, aio_response.status, aio_response._content,
-                                    headers=aio_response.headers, cookies=aio_response.cookies,
-                                    encoding=aio_response._get_encoding())
+        return Response(request, aio_response.status, aio_response._content,
+                        headers=aio_response.headers, cookies=aio_response.cookies,
+                        encoding=aio_response._get_encoding())

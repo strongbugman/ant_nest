@@ -7,14 +7,17 @@ from collections import defaultdict
 import logging
 
 from lxml import html
+from yarl import URL
 
 
 class Request:
     __slots__ = ('url', 'params', 'method', 'headers', 'cookies', 'data', 'proxy', 'max_redirects', 'allow_redirects')
 
-    def __init__(self, url: str, method='GET', params: Optional[dict]=None, headers: Optional[dict]=None,
+    def __init__(self, url: Union[str, URL], method='GET', params: Optional[dict]=None, headers: Optional[dict]=None,
                  cookies: Optional[dict]=None, data: Optional[Any]=None, proxy: Optional[str]=None,
                  allow_redirects=True, max_redirects=10):
+        if isinstance(url, str):
+            url = URL(url)
         self.url = url
         self.params = params
         self.method = method
@@ -26,7 +29,7 @@ class Request:
         self.max_redirects = max_redirects
 
     def __repr__(self):
-        return '{:s}: {:s} {:s}'.format(self.__class__.__name__, self.method, self.url)
+        return '{:s}: {:s} {:s}'.format(self.__class__.__name__, self.method, str(self.url))
 
 
 class Response:
@@ -59,7 +62,7 @@ class Response:
         return self._html_element
 
     def __repr__(self):
-        return '{:s}: {:s} {:d}'.format(self.__class__.__name__, self.url, self.status)
+        return '{:s}: {:s} {:d}'.format(self.__class__.__name__, str(self.url), self.status)
 
 
 class FiledValidationError(Exception):
@@ -210,6 +213,13 @@ class ItemExtractor:
             value = None
             for xpath, extract_type in all_xpath:
                 extract_value = response.html_element.xpath(xpath)
+                if len(extract_value) == 0:
+                    continue
+                elif not isinstance(extract_value[0], str):
+                    raise ItemExtractError('The xpath({:s}) result must be str'.format(
+                        xpath
+                    ))
+                # handle by extract type
                 if extract_type == self.take_first:
                     extract_value = extract_value[0]
                 elif extract_type == self.join_all:
