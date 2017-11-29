@@ -6,6 +6,7 @@ from ant_nest.things import (
     Request, Response, Item, IntField, FloatField, StringField, FiledValidationError, ItemExtractor, ItemExtractError)
 from ant_nest.pipelines import Pipeline
 from ant_nest.ant import Ant, ThingProcessError
+from ant_nest import cli
 
 
 def test_request():
@@ -139,3 +140,13 @@ def test_extract():
     item_extractor.add_xpath('paragraph', '/html/head/title/text()')
     with pytest.raises(ItemExtractError):
         item = item_extractor.extract(response)
+
+
+class MAnt(Ant):
+    async def run(self):
+        pass
+
+
+def test_cli_get_ants():
+    ants = cli.get_ants(['tests'])
+    assert MAnt is list(ants.values())[0]

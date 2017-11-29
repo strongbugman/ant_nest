@@ -8,7 +8,7 @@ requires =['aiohttp==2.3.2', 'async-timeout==2.0.0', 'chardet==3.0.4', 'lxml==4.
 
 setup(
     name="ant_nest",
-    version="0.11",
+    version="0.12",
     url='https://github.com/YugWu/ant_nest',
     description='A simple and clear Web Crawler framework build on python3.6+ with async',
     long_description=open('README.rst').read(),
@@ -23,5 +23,8 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     packages=find_packages(exclude=('tests', 'tests.*')),
-    install_requires=requires
+    install_requires=requires,
+    entry_points={
+        'console_scripts': ['ant_nest = ant_nest.cli:main']
+    },
 )
