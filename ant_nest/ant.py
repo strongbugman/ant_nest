@@ -2,6 +2,9 @@ from typing import Any, Optional, List, Coroutine, Union
 import abc
 import itertools
 import logging
+import asyncio
+from asyncio.coroutines import _COROUTINE_TYPES
+from asyncio.queues import Queue
 
 import aiohttp
 from aiohttp.client_reqrep import ClientResponse
@@ -18,11 +21,14 @@ class Ant(abc.ABC):
 
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
+        # for background coroutines
+        self.__queue = Queue()
+        self.__count = 0
 
     async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None, headers: Optional[dict]=None,
                       cookies: Optional[dict]=None, data: Optional[Any]=None,
                       proxy: Optional[str]=None) -> Response:
-        self.logger.debug('{:s} {:s}'.format(method, url))
+        self.logger.debug('{:s} {:s}'.format(method, str(url)))
         kwargs = locals()
         kwargs.pop('self')
 
@@ -60,9 +66,24 @@ class Ant(abc.ABC):
         try:
             await self.open()
             await self.run()
+            await self.__run_until_complete()
             await self.close()
         except Exception as e:
             self.logger.exception('Run main coroutine with ' + e.__class__.__name__)
+
+    def ensure_future(self, coro_or_future: _COROUTINE_TYPES):
+        self.__count += 1
+
+        def _done_callback(f):
+            self.__queue.put_nowait(f)
+
+        asyncio.ensure_future(coro_or_future).add_done_callback(_done_callback)
+
+    async def __run_until_complete(self):
+        done_count = 0
+        while done_count != self.__count:
+            await self.__queue.get()
+            done_count += 1
 
     async def _handle_thing_with_pipelines(self, thing: Things, pipelines: List[Pipeline]) -> Optional[Things]:
         """Process thing one by one, break the process chain when get None

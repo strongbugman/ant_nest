@@ -150,3 +150,32 @@ class MAnt(Ant):
 def test_cli_get_ants():
     ants = cli.get_ants(['tests'])
     assert MAnt is list(ants.values())[0]
+
+
+def test_cli_open_browser():
+    req = Request('http://test.com')
+    res = Response(req, 200, b'<p>Hello world<\p>', {})
+
+    def open_browsere_function(url):
+        return True
+
+    assert cli.open_response_in_browser(res, _open_browser_function=open_browsere_function)
+
+
+@pytest.mark.asyncio
+async def test_ant_ensure_future():
+
+    class TAnt(Ant):
+        count = 0
+        max_count = 10
+
+        async def cor(self):
+            self.count += 1
+
+        async def run(self):
+            for i in range(self.max_count):
+                self.ensure_future(self.cor())
+
+    ant = TAnt()
+    await ant.main()
+    assert ant.count == ant.max_count

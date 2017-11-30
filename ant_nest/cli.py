@@ -1,5 +1,5 @@
 """CLI entry points"""
-from typing import Type, Dict, List
+from typing import Type, Dict, List, Callable
 import argparse
 import inspect
 import os
@@ -8,8 +8,11 @@ import asyncio
 from importlib import import_module
 from pkgutil import iter_modules
 from traceback import format_exc
+import webbrowser
+import tempfile
 
 from .ant import Ant
+from .things import Response
 
 
 def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
@@ -41,6 +44,14 @@ def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
 async def run_ant(ant_cls: Type[Ant]):
     ant = ant_cls()
     await ant.main()
+
+
+def open_response_in_browser(response: Response, file_type: str='.html',
+                             _open_browser_function: Callable[..., bool]=webbrowser.open) -> bool:
+    fd, path = tempfile.mkstemp(file_type)
+    os.write(fd, response.content)
+    os.close(fd)
+    return _open_browser_function('file://' + path)
 
 
 def main():
