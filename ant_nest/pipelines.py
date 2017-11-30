@@ -39,7 +39,7 @@ class ReportPipeline(Pipeline):
 
 
 # Response pipelines
-class FilterErrorResponsePipeline(Pipeline):
+class ResponseFilterErrorPipeline(Pipeline):
     def process(self, ant: '.ant_nest.Ant', thing: Response) -> Optional[Response]:
         if thing.status >= 400:
             self.logger.warning('Response: {:s} has bean dropped because http status {:d}'.format(str(thing),
@@ -49,7 +49,8 @@ class FilterErrorResponsePipeline(Pipeline):
             return thing
 
 
-class RetryResponsePipeline(Pipeline):
+class ResponseRetryPipeline(Pipeline):
+    """This pipeline should be in front of the pipeline chain"""
     def __init__(self, retries=3):
         self.retries = retries
         super().__init__()
@@ -58,22 +59,24 @@ class RetryResponsePipeline(Pipeline):
         retries = self.retries
         while retries >= 0:
             if thing.status >= 400:
-                self.logger.warning('Retry {:s} because http status {:d}'.format(str(thing.request), thing.status))
+                self.logger.debug('Retry {:s} because http status {:d}'.format(str(thing.request), thing.status))
                 thing = await ant._request(thing.request)
             else:
                 return thing
             retries -= 1
+        self.logger.warning('{:d} reties failed for {:s}'.format(self.retries, thing))
+        return thing
 
 
 # Request pipelines
-class NoRedirectsRequestPipeline(Pipeline):
+class RequestNoRedirectsPipeline(Pipeline):
     def process(self, ant: '.ant_nest.Ant', thing: Request) -> Request:
         thing.allow_redirects = False
         thing.max_redirects = 0
         return thing
 
 
-class ProxyRequestPipeline(Pipeline):
+class RequestProxyPipeline(Pipeline):
     def __init__(self, proxy: str):
         self.proxy = proxy
         super().__init__()
@@ -83,20 +86,33 @@ class ProxyRequestPipeline(Pipeline):
         return thing
 
 
+class RequestDuplicateFilterPipeline(Pipeline):
+    def __init__(self):
+        self.__request_urls = set()
+        super().__init__()
+
+    def process(self, ant: '.ant_nest.ant', thing: Request) -> Optional[Request]:
+        if thing.url in self.__request_urls:
+            return None
+        else:
+            self.__request_urls.add(thing.url)
+            return thing
+
+
 # Item pipelines
-class PrintItemPipeline(Pipeline):
+class ItemPrintPipeline(Pipeline):
     def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
         print(thing)
         return thing
 
 
-class ValidateItemPipeline(Pipeline):
+class ItemValidatePipeline(Pipeline):
     def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
         thing.validate()
         return thing
 
 
-class ReplaceItemFiledPipeline(Pipeline):
+class ItemFieldReplacePipeline(Pipeline):
     def __init__(self, fields: List[str], excess_chars: Tuple[str]=('\r', '\n', '\t')):
         self.fields = fields
         self.excess_chars = excess_chars
@@ -105,5 +121,6 @@ class ReplaceItemFiledPipeline(Pipeline):
     def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
         for field in self.fields:
             for char in self.excess_chars:
-                thing[field] = thing[field].replace(char, '')
+                if 'field' in thing and isinstance(thing['field'], str):
+                    thing[field] = thing[field].replace(char, '')
         return thing
