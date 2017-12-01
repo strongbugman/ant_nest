@@ -33,6 +33,7 @@ class ReportPipeline(Pipeline):
         if self.report_type is None:
             self.report_type = thing.__class__.__name__
         self.count += 1
+        return thing
 
     def on_spider_close(self, ant: '.ant_nest.Ant'):
         self.logger.info('Get {:d} {:s} in total'.format(self.count, self.report_type))
@@ -121,6 +122,6 @@ class ItemFieldReplacePipeline(Pipeline):
     def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
         for field in self.fields:
             for char in self.excess_chars:
-                if 'field' in thing and isinstance(thing['field'], str):
+                if field in thing and isinstance(thing['field'], str):
                     thing[field] = thing[field].replace(char, '')
         return thing
