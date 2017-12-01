@@ -166,8 +166,12 @@ def test_cli_open_browser():
 async def test_ant_ensure_future():
 
     class TAnt(Ant):
-        count = 0
-        max_count = 10
+
+        def __init__(self, limit):
+            super().__init__()
+            self._Ant__limit = limit
+            self.count = 0
+            self.max_count = 10
 
         async def cor(self):
             self.count += 1
@@ -176,6 +180,15 @@ async def test_ant_ensure_future():
             for i in range(self.max_count):
                 self.ensure_future(self.cor())
 
-    ant = TAnt()
+    ant = TAnt(3)
+    await ant.main()
+    assert ant.count == ant.max_count
+
+    class ATAnt(TAnt):
+        async def run(self):
+            for c in self.as_completed((self.cor() for i in range(self.max_count))):
+                await c
+
+    ant = ATAnt(3)
     await ant.main()
     assert ant.count == ant.max_count
