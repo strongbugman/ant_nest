@@ -5,8 +5,9 @@ import os
 from ant_nest.things import (
     Request, Response, Item, IntField, FloatField, StringField, FiledValidationError, ItemExtractor, ItemExtractError)
 from ant_nest.pipelines import Pipeline
-from ant_nest.ant import Ant, ThingProcessError
+from ant_nest.ant import Ant
 from ant_nest import cli
+from ant_nest.exceptions import ThingDropped
 
 
 def test_request():
@@ -107,7 +108,7 @@ async def test_pipelines():
             return None
 
     pls[5] = TestPipeline()
-    with pytest.raises(ThingProcessError):
+    with pytest.raises(ThingDropped):
         await ant._handle_thing_with_pipelines(thing, pls)
 
 
@@ -136,7 +137,6 @@ def test_extract():
     item = item_extractor.extract(response)
     assert item.paragraph == 'test'
 
-    item_extractor = ItemExtractor(TestItem)
     item_extractor.add_xpath('paragraph', '/html/head/title/text()')
     with pytest.raises(ItemExtractError):
         item = item_extractor.extract(response)

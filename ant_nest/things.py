@@ -9,6 +9,8 @@ import logging
 from lxml import html
 from yarl import URL
 
+from .exceptions import FiledValidationError, ItemExtractError
+
 
 class Request:
     __slots__ = ('url', 'params', 'method', 'headers', 'cookies', 'data', 'proxy', 'max_redirects', 'allow_redirects')
@@ -65,14 +67,6 @@ class Response:
         return '{:s}: {:s} {:d}'.format(self.__class__.__name__, str(self.url), self.status)
 
 
-class FiledValidationError(Exception):
-    pass
-
-
-class ItemExtractError(Exception):
-    """Raise when extract item when error"""
-
-
 class IntField:
     _type = int
     storage_name = ''
@@ -100,7 +94,7 @@ class IntField:
             except (ValueError, TypeError) as e:
                 raise FiledValidationError(e)
         else:
-            raise FiledValidationError
+            raise FiledValidationError('value is None')
 
     @classmethod
     def make_shadow_name(cls, name: str) -> str:
@@ -180,9 +174,15 @@ class Item(MutableMapping, metaclass=ItemMeta):
         """Validate item`s type.
         Get descriptors reference method from __class__.__dict__"""
         class_dict = self.__class__.__dict__
-        for k, v in self.items():
-            if k in class_dict:
-                setattr(self, k, class_dict[k].validate(v))
+        for k, obj in class_dict.items():
+            if isinstance(obj, IntField):
+                try:
+                    setattr(self, k, class_dict[k].validate(getattr(self, k, None)))
+                except FiledValidationError as e:
+                    if 'value is None' in str(e):
+                        raise FiledValidationError('{:s}`s value is None'.format(k))
+                    else:
+                        raise e
 
     def __repr__(self):
         return '{:s}: {:s}'.format(self.__class__.__name__, str(dict(self)))
@@ -196,11 +196,10 @@ class ItemExtractor:
     join_all = 'join_all'
     do_nothing = 'do_nothing'
 
-    xpath = defaultdict(list)  # type: DefaultDict[str, List[Tuple[str, str]]]
-
     def __init__(self, item_class: Type[Item]):
         self.item_class = item_class
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.xpath = defaultdict(list)  # type: DefaultDict[str, List[Tuple[str, str]]]
 
     def add_xpath(self, key: str, xpath: str, extract_type=take_first):
         self.xpath[key].append((xpath, extract_type))
