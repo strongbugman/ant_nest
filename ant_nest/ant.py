@@ -10,8 +10,9 @@ import aiohttp
 from aiohttp.client_reqrep import ClientResponse
 from yarl import URL
 
-from .pipelines import Pipeline, ThingProcessError
+from .pipelines import Pipeline
 from .things import Request, Response, Item, Things
+from .exceptions import ThingDropped
 
 
 class Ant(abc.ABC):
@@ -147,9 +148,10 @@ class Ant(abc.ABC):
             if isinstance(thing, Coroutine):
                 thing = await thing
             if thing is None:
-                raise ThingProcessError(
-                    'The thing {:s} is dropped because pipeline: {:s}'.format(str(raw_thing),
-                                                                              pipeline.__class__.__name__))
+                msg = 'The thing {:s} is dropped by {:s}'.format(str(raw_thing),
+                                                                 pipeline.__class__.__name__)
+                self.logger.warning(msg)
+                raise ThingDropped(msg)
         return thing
 
     async def _request(self, req: Request) -> Response:
