@@ -1,6 +1,8 @@
-import pytest
 import pickle
 import os
+import asyncio
+
+import pytest
 
 from ant_nest.things import (
     Request, Response, Item, IntField, FloatField, StringField, FiledValidationError, ItemExtractor, ItemExtractError)
@@ -169,7 +171,7 @@ async def test_ant_ensure_future():
 
         def __init__(self, limit):
             super().__init__()
-            self._Ant__limit = limit
+            self.CONCURRENT_LIMIT = limit
             self.count = 0
             self.max_count = 10
 
@@ -192,3 +194,14 @@ async def test_ant_ensure_future():
     ant = ATAnt(3)
     await ant.main()
     assert ant.count == ant.max_count
+
+    class TAnt(Ant):
+        COROUTINE_TIMEOUT = 0.1
+
+        async def run(self):
+            for cor in self.as_completed([asyncio.sleep(0.2)]):
+                await cor
+
+    ant = TAnt()
+    with pytest.raises(asyncio.TimeoutError):
+        await ant.run()

@@ -114,8 +114,8 @@ class RequestDuplicateFilterPipeline(Pipeline):
 
 
 class RequestUserAgentPipeline(Pipeline):
-    user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 ' \
-                 'Safari/537.36'
+    user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/537.36 (KHTML, like Gecko)' \
+                 'Chrome/62.0.3202.89 Safari/537.36 Name'
 
     def __init__(self, user_agent=user_agent):
         super().__init__()
