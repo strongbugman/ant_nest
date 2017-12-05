@@ -43,7 +43,7 @@ class ReportPipeline(Pipeline):
         now_time = time.time()
         if now_time - self.last_time > 60:
             count = self.count - self.last_count
-            self.logger.info('Get {:d} {:s} in total with {:d}/min'.format(self.count, self.report_type, count))
+            self.logger.info('Get {:d} {:s} in total with {:d}/min rate'.format(self.count, self.report_type, count))
             self.last_time = now_time
             self.last_count = self.count
         return thing
