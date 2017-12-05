@@ -2,14 +2,14 @@
 from setuptools import setup, find_packages
 
 
-requires =['aiohttp==2.3.2', 'async-timeout==2.0.0', 'chardet==3.0.4', 'lxml==4.1.1', 'multidict==3.3.2',
-           'py==1.5.2', 'pytest==3.2.5', 'pytest-asyncio==0.8.0', 'yarl==0.13.0', 'aiomysql==0.0.9', 'PyMySQL==0.7.11']
+requires = ['aiohttp==2.3.2', 'async-timeout==2.0.0', 'chardet==3.0.4', 'lxml==4.1.1', 'multidict==3.3.2',
+            'py==1.5.2', 'pytest==3.2.5', 'pytest-asyncio==0.8.0', 'yarl==0.13.0', 'aiomysql==0.0.9', 'PyMySQL==0.7.11']
 
 
 setup(
     name="ant_nest",
-    version="0.16",
-    url='https://github.com/YugWu/ant_nest',
+    version="0.17",
+    url='https://github.com/6ugman/ant_nest',
     description='A simple and clear Web Crawler framework build on python3.6+ with async',
     long_description=open('README.rst').read(),
     author='Bruce Wu',
