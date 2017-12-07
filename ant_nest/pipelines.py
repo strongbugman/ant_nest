@@ -65,8 +65,9 @@ class ResponseFilterErrorPipeline(Pipeline):
 
 class ResponseRetryPipeline(Pipeline):
     """This pipeline should be in front of the pipeline chain"""
-    def __init__(self, retries=3):
+    def __init__(self, retries: int=3, interval: int=3):
         self.retries = retries
+        self.interval = interval
         super().__init__()
 
     async def process(self, ant: '.ant_nest.ant', thing: Response) -> Optional[Response]:
@@ -74,11 +75,12 @@ class ResponseRetryPipeline(Pipeline):
         while retries >= 0:
             if thing.status >= 400:
                 self.logger.info('Retry {:s} because http status {:d}'.format(str(thing.request), thing.status))
+                await asyncio.sleep(self.interval)
                 thing = await ant._request(thing.request)
             else:
                 return thing
             retries -= 1
-        self.logger.warning('{:d} reties failed for {:s}'.format(self.retries, thing))
+        self.logger.warning('{:d} reties failed for {:s}'.format(self.retries, str(thing)))
         return thing
 
 

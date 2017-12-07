@@ -119,7 +119,7 @@ class Ant(abc.ABC):
             self.__queue.put_nowait(self.timeout_wrapper(coroutine, timeout=timeout))
 
     def as_completed(self, coroutines: Union[Iterator[Coroutine], List[Coroutine]],
-                     limit: int=DEFAULT_VALUE, timeout: int=DEFAULT_VALUE) -> Generator[Coroutine]:
+                     limit: int=DEFAULT_VALUE, timeout: int=DEFAULT_VALUE) -> Generator[Coroutine, None, None]:
         """Custom as_completed method provide coroutines concurrent limit"""
         if limit == DEFAULT_VALUE:
             limit = self.CONCURRENT_LIMIT
