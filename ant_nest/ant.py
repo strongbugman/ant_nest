@@ -192,8 +192,13 @@ class Ant(abc.ABC):
         kwargs = {k: getattr(req, k) for k in req.__slots__}
         cookies = kwargs.pop('cookies')
 
+        # proxy auth not work in one session with many requests
+        proxy_with_auth = False
+        if req.proxy is not None and URL(req.proxy).user is not None:
+            proxy_with_auth = True
+
         host = req.url.host
-        if host not in self.sessions:
+        if host not in self.sessions or proxy_with_auth:
             session = aiohttp.ClientSession(cookies=cookies)
             self.sessions[host] = session
         else:
