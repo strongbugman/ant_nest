@@ -199,6 +199,8 @@ class Ant(abc.ABC):
 
         host = req.url.host
         if host not in self.sessions or proxy_with_auth:
+            if host in self.sessions:
+                await self.sessions[host].close()
             session = aiohttp.ClientSession(cookies=cookies)
             self.sessions[host] = session
         else:
