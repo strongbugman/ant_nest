@@ -118,6 +118,7 @@ concurrent limit, but it`s complex to get the balance between performance and li
 Todo
 ====
 
+* Memory leaks
 * Regular expressions extractor support
 * Jpath(json-path) extractor support
 * Redis pipeline

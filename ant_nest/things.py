@@ -35,7 +35,7 @@ class Request:
 
 
 class Response:
-    __slots__ = ('url', 'status', 'headers', 'cookies', 'encoding', 'content', 'text', 'request', '_html_element',
+    __slots__ = ('url', 'status', 'headers', 'cookies', 'encoding', 'content', '_text', 'request', '_html_element',
                  '_json')
 
     def __init__(self, request: Request, status: int, content: bytes, headers: Optional[dict]=None,
@@ -47,9 +47,15 @@ class Response:
         self.cookies = cookies
         self.encoding = encoding
         self.content = content
-        self.text = content.decode(encoding)
+        self._text = None
         self._html_element = None
         self._json = None
+
+    @property
+    def text(self) -> str:
+        if self._text is None:
+            self._text = self.content.decode(self.encoding)
+        return self._text
 
     @property
     def json(self) -> Any:

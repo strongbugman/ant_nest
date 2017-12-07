@@ -25,7 +25,7 @@ def test_response_fileter_error_pipeline():
 
 @pytest.mark.asyncio
 async def test_response_retry_pipeline():
-    pl = pipelines.ResponseRetryPipeline()
+    pl = pipelines.ResponseRetryPipeline(interval=0)
     res = things.Response(things.Request('http://test.com'), 200, b'')
     err_res = things.Response(things.Request('http://test.com'), 403, b'')
 
