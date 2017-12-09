@@ -5,9 +5,11 @@ import json
 import abc
 from collections import defaultdict
 import logging
+import re
 
 from lxml import html
 from yarl import URL
+import jpath
 
 from .exceptions import FiledValidationError, ItemExtractError
 
@@ -205,32 +207,43 @@ class ItemExtractor:
     def __init__(self, item_class: Type[Item]):
         self.item_class = item_class
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.xpath = defaultdict(list)  # type: DefaultDict[str, List[Tuple[str, str]]]
+        self.path = defaultdict(list)  # type: DefaultDict[str, List[Tuple[str, str, str]]]
 
     def add_xpath(self, key: str, xpath: str, extract_type=take_first):
-        self.xpath[key].append((xpath, extract_type))
+        self.path[key].append(('xpath', xpath, extract_type))
+
+    def add_regex(self, key: str, pattern: str, extract_type=take_first):
+        self.path[key].append(('regex', pattern, extract_type))
+
+    def add_jpath(self, key: str, jpath, extract_type=take_first):
+        self.path[key].append(('jpath', jpath, extract_type))
 
     def extract(self, response: Response) -> Item:
-        """Extract item from response by xpath"""
-        self.logger.debug('Extract item: {:s} with xpath: {:s}'.format(self.item_class.__name__, str(self.xpath)))
+        """Extract item from response by path with xpath, jpath or re."""
+        self.logger.debug('Extract item: {:s} with path: {:s}'.format(self.item_class.__name__, str(self.path)))
         item = self.item_class()
-        for key, all_xpath in self.xpath.items():
+        for key, all_xpath in self.path.items():
             value = None
-            for xpath, extract_type in all_xpath:
-                extract_value = response.html_element.xpath(xpath)
+            for path_type, path, extract_type in all_xpath:
+                if path_type == 'xpath':
+                    extract_value = response.html_element.xpath(path)
+                elif path_type == 'regex':
+                    extract_value = re.findall(path, response.text)
+                elif path_type == 'jpath':
+                    extract_value = jpath.get_all(path, response.json)
+                else:
+                    continue
                 if len(extract_value) == 0:
                     continue
-                elif not isinstance(extract_value[0], str):
-                    raise ItemExtractError('The xpath({:s}) result must be str'.format(
-                        xpath
-                    ))
                 # handle by extract type
                 if extract_type == self.take_first:
                     extract_value = extract_value[0]
                 elif extract_type == self.join_all:
+                    extract_value = list(filter(lambda x: isinstance(x, str), extract_value))  # join string only
                     extract_value = ''.join(extract_value)
                 elif extract_value == self.do_nothing:
                     pass
+                # check multiple path`s result
                 if extract_value is not None:
                     if value is not None and value != extract_value:
                         raise ItemExtractError(
