@@ -241,3 +241,28 @@ class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
                                      values=','.join(values))
         await self.push_data(sql)
         return thing
+
+
+class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
+    sql_format = 'UPDATE {database}.{table} SET {pairs} WHERE {primary_key}={primary_value}'
+
+    def __init__(self, primary_key: str, host: str, port: int, user: str, password: str, database: str, table: str,
+                 charset: str='utf8'):
+        super().__init__(host, port, user, password, database, table, charset=charset)
+        self.primary_key = primary_key
+
+    async def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
+        pairs = []
+        primary_value = None
+
+        for k, v in thing.items():
+            if k == self.primary_key:
+                primary_value = self.convert_item_value(v)
+            else:
+                pairs.append('{:s}={:s}'.format(k, self.convert_item_value(v)))
+
+        if primary_value is not None:
+            sql = self.sql_format.format(database=self.database, table=self.table, pairs=','.join(pairs),
+                                         primary_key=self.primary_key, primary_value=primary_value)
+            await self.push_data(sql)
+        return thing

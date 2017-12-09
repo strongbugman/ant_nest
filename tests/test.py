@@ -129,6 +129,7 @@ async def test_ant():
 def test_extract():
     class TestItem(Item):
         paragraph = StringField()
+        title = StringField()
 
     request = Request(url='https://www.python.org/')
     with open('./tests/test.html', 'rb') as f:
@@ -136,12 +137,23 @@ def test_extract():
 
     item_extractor = ItemExtractor(TestItem)
     item_extractor.add_xpath('paragraph', '/html/body/div/p/text()')
+    item_extractor.add_regex('title', '<title>([A-Z a-z]+)</title>', item_extractor.join_all)
     item = item_extractor.extract(response)
     assert item.paragraph == 'test'
+    assert item.title == 'Test html'
 
     item_extractor.add_xpath('paragraph', '/html/head/title/text()')
     with pytest.raises(ItemExtractError):
         item = item_extractor.extract(response)
+
+    class TestItem(Item):
+        author = StringField()
+
+    response = Response(request, 200, b'{"a": {"b": {"c": 1}}}')
+    item_extractor = ItemExtractor(TestItem)
+    item_extractor.add_jpath('author', 'a.b.c')
+    item = item_extractor.extract(response)
+    assert item.author == 1
 
 
 class MAnt(Ant):
