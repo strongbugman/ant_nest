@@ -170,10 +170,10 @@ def test_cli_open_browser():
     req = Request('http://test.com')
     res = Response(req, 200, b'<p>Hello world<\p>', {})
 
-    def open_browsere_function(url):
+    def open_browser_function(url):
         return True
 
-    assert cli.open_response_in_browser(res, _open_browser_function=open_browsere_function)
+    assert cli.open_response_in_browser(res, _open_browser_function=open_browser_function)
 
 
 @pytest.mark.asyncio
