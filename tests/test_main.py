@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from ant_nest.things import (
-    Request, Response, Item, IntField, FloatField, StringField, FiledValidationError, ItemExtractor, ItemExtractError)
+    Request, Response, Item, IntField, FloatField, StringField, FieldValidationError, ItemExtractor, ItemExtractError)
 from ant_nest.pipelines import Pipeline
 from ant_nest.ant import Ant
 from ant_nest import cli
@@ -72,7 +72,7 @@ def test_item():
     assert set(item.values()) == {2, 0.333}
     assert dict(item.items()) == {'t1': 2, 't2': 0.333}
 
-    with pytest.raises(FiledValidationError):
+    with pytest.raises(FieldValidationError):
         item.t1 = '1s'
         item.validate()
 
@@ -92,6 +92,24 @@ def test_item():
     del item.t1
     with pytest.raises(AttributeError):
         item.t1
+
+    # "default" and "null" kwargs
+    class TestItem(Item):
+        x = IntField(default=10)
+        y = StringField(null=True)
+        z = IntField()
+
+    item = TestItem()
+    assert item.x == 10
+    with pytest.raises(FieldValidationError):
+        item.validate()
+    item.z = 1
+    item.validate()
+
+    # init with kwargs
+    item = TestItem(z=10, a=1)
+    assert item.z == 10
+    assert item.a == 1
 
 
 @pytest.mark.asyncio
