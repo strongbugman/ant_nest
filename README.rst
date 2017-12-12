@@ -2,6 +2,14 @@
 AntNest
 ========
 
+.. image:: https://img.shields.io/pypi/v/ant_nest.svg
+   :target: https://pypi.python.org/pypi/ant_nest
+   :alt: PyPI Version
+
+.. image:: https://img.shields.io/travis/6ugman/ant_nest/master.svg
+   :target: https://travis-ci.org/6ugman/ant_nest
+   :alt: PyPI Version
+
 Overview
 ========
 
@@ -40,7 +48,7 @@ Let`s take a look, create book.py first::
     # define a item structure we want to crawl
     class BookItem(Item):
         name = StringField()
-        author = StringField()
+        author = StringField(default='Li')
         content = StringField()
         origin_url = StringField()
         date = IntField(null=True)  # The filed is optional

@@ -2,7 +2,7 @@ class ThingDropped(Exception):
     """Raise when pipeline dropped a thing"""
 
 
-class FiledValidationError(Exception):
+class FieldValidationError(Exception):
     pass
 
 

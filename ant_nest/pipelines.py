@@ -10,7 +10,7 @@ import datetime
 import aiomysql
 
 from .things import Things, Response, Request, Item
-from .exceptions import FiledValidationError
+from .exceptions import FieldValidationError
 
 
 class Pipeline:
@@ -142,7 +142,7 @@ class ItemValidatePipeline(Pipeline):
         try:
             thing.validate()
             return thing
-        except FiledValidationError:
+        except FieldValidationError:
             return None
 
 
