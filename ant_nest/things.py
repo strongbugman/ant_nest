@@ -265,3 +265,6 @@ class ItemExtractor:
                         value = extract_value
             item[key] = value
         return item
+
+
+__all__ = ['Request', 'Response', 'Item', 'ItemExtractor', 'Things'] + [var for var in vars().keys() if 'Field' in var]
