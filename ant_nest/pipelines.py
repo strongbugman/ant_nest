@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple, DefaultDict, Dict, Any
+from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, TYPE_CHECKING
 import logging
 from collections import defaultdict
 import json
@@ -6,24 +6,29 @@ import asyncio
 import os
 import time
 import datetime
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 import aiomysql
+import aiosmtplib
 
 from .things import Things, Response, Request, Item
 from .exceptions import FieldValidationError
+if TYPE_CHECKING:
+    from ant_nest.ant import Ant
 
 
 class Pipeline:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def on_spider_open(self, ant: '.ant_nest.Ant') -> None:
+    async def on_spider_open(self, ant: 'Ant') -> None:
         """Call when ant open, method or coroutine"""
 
-    async def on_spider_close(self, ant: '.ant_nest.Ant') -> None:
+    async def on_spider_close(self, ant: 'Ant') -> None:
         """Call when ant close, method or coroutine"""
 
-    async def process(self, ant: '.ant_nest.ant', thing: Things) -> Optional[Things]:
+    async def process(self, ant: 'Ant', thing: Things) -> Optional[Things]:
         """method or coroutine"""
         return thing
 
@@ -36,7 +41,7 @@ class ReportPipeline(Pipeline):
         self.last_count = 0
         super().__init__()
 
-    def process(self, ant: '.ant_nest.ant', thing: Things) -> Things:
+    def process(self, ant: 'Ant', thing: Things) -> Things:
         if self.report_type is None:
             self.report_type = thing.__class__.__name__
         self.count += 1
@@ -48,14 +53,14 @@ class ReportPipeline(Pipeline):
             self.last_count = self.count
         return thing
 
-    def on_spider_close(self, ant: '.ant_nest.Ant'):
+    def on_spider_close(self, ant: 'Ant'):
         if self.report_type is not None:
             self.logger.info('Get {:d} {:s} in total'.format(self.count, self.report_type))
 
 
 # Response pipelines
 class ResponseFilterErrorPipeline(Pipeline):
-    def process(self, ant: '.ant_nest.Ant', thing: Response) -> Optional[Response]:
+    def process(self, ant: 'Ant', thing: Response) -> Optional[Response]:
         if thing.status >= 400:
             self.logger.warning('Response: {:s} has bean dropped'.format(str(thing)))
             return None
@@ -70,7 +75,7 @@ class ResponseRetryPipeline(Pipeline):
         self.interval = interval
         super().__init__()
 
-    async def process(self, ant: '.ant_nest.ant', thing: Response) -> Optional[Response]:
+    async def process(self, ant: 'Ant', thing: Response) -> Optional[Response]:
         retries = self.retries
         while retries >= 0:
             if thing.status >= 400:
@@ -86,7 +91,7 @@ class ResponseRetryPipeline(Pipeline):
 
 # Request pipelines
 class RequestNoRedirectsPipeline(Pipeline):
-    def process(self, ant: '.ant_nest.Ant', thing: Request) -> Request:
+    def process(self, ant: 'Ant', thing: Request) -> Request:
         thing.allow_redirects = False
         thing.max_redirects = 0
         return thing
@@ -97,7 +102,7 @@ class RequestProxyPipeline(Pipeline):
         self.proxy = proxy
         super().__init__()
 
-    def process(self, ant: '.ant_nest.ant', thing: Request) -> Request:
+    def process(self, ant: 'Ant', thing: Request) -> Request:
         thing.proxy = self.proxy
         return thing
 
@@ -107,7 +112,7 @@ class RequestDuplicateFilterPipeline(Pipeline):
         self.__request_urls = set()
         super().__init__()
 
-    def process(self, ant: '.ant_nest.ant', thing: Request) -> Optional[Request]:
+    def process(self, ant: 'Ant', thing: Request) -> Optional[Request]:
         if thing.url in self.__request_urls:
             return None
         else:
@@ -132,13 +137,13 @@ class RequestUserAgentPipeline(Pipeline):
 
 # Item pipelines
 class ItemPrintPipeline(Pipeline):
-    def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
+    def process(self, ant: 'Ant', thing: Item) -> Item:
         self.logger.info(str(thing))
         return thing
 
 
 class ItemValidatePipeline(Pipeline):
-    def process(self, ant: '.ant_nest.ant', thing: Item) -> Optional[Item]:
+    def process(self, ant: 'Ant', thing: Item) -> Optional[Item]:
         try:
             thing.validate()
             return thing
@@ -152,7 +157,7 @@ class ItemFieldReplacePipeline(Pipeline):
         self.excess_chars = excess_chars
         super().__init__()
 
-    def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
+    def process(self, ant: 'Ant', thing: Item) -> Item:
         for field in self.fields:
             for char in self.excess_chars:
                 if field in thing and isinstance(thing[field], str):
@@ -160,25 +165,29 @@ class ItemFieldReplacePipeline(Pipeline):
         return thing
 
 
-class ItemJsonDumpPipeline(Pipeline):
+class ItemBaseJsonDumpPipeline(Pipeline):
+    @staticmethod
+    def _dump(file_path: str, data: Dict) -> None:
+        with open(file_path, 'w') as f:
+            json.dump(data, f)
+
+    def dump(self, ant: 'Ant', file_path: str, data: Dict) -> None:
+        ant.ensure_future(asyncio.get_event_loop().run_in_executor(None, self._dump, file_path, data))
+
+
+class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
     def __init__(self, file_dir: str='.'):
         super().__init__()
         self.file_dir = file_dir
         self.data = defaultdict(list)  # type: DefaultDict[str, List[Dict]]
 
-    def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
+    def process(self, ant: 'Ant', thing: Item) -> Item:
         self.data[thing.__class__.__name__].append(dict(thing))
         return thing
 
-    def dump(self, file_path: str, data: dict):
-        with open(file_path, 'w') as f:
-            json.dump(data, f)
-
-    async def on_spider_close(self, ant: '.ant_nest.Ant'):
+    def on_spider_close(self, ant: 'Ant') -> None:
         for file_name, data in self.data.items():
-            ant.ensure_future(
-                asyncio.get_event_loop().run_in_executor(
-                    None, self.dump, os.path.join(self.file_dir, file_name + '.json'), data))
+            self.dump(ant, os.path.join(self.file_dir, file_name + '.json'), data)
 
 
 class ItemBaseMysqlPipeline(Pipeline):
@@ -193,11 +202,11 @@ class ItemBaseMysqlPipeline(Pipeline):
         self.charset = charset
         self.pool = None
 
-    async def on_spider_open(self, ant: '.ant_nest.ant') -> None:
+    async def on_spider_open(self, ant: 'Ant') -> None:
         self.pool = await aiomysql.create_pool(host=self.host, port=self.port, user=self.user, password=self.password,
                                                db=self.database, charset=self.charset, use_unicode=True)
 
-    def on_spider_close(self, ant: '.ant_nest.ant') -> None:
+    def on_spider_close(self, ant: 'Ant') -> None:
         self.pool.close()
 
     async def push_data(self, sql: str) -> None:
@@ -231,7 +240,7 @@ class ItemBaseMysqlPipeline(Pipeline):
 class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
     sql_format = 'INSERT IGNORE INTO {database}.{table} ({fields}) VALUES ({values})'
 
-    async def process(self, ant: '.ant_nest.ant', thing: Item):
+    async def process(self, ant: 'Ant', thing: Item):
         fields = []
         values = []
         for k, v in thing.items():
@@ -251,7 +260,7 @@ class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
         super().__init__(host, port, user, password, database, table, charset=charset)
         self.primary_key = primary_key
 
-    async def process(self, ant: '.ant_nest.ant', thing: Item) -> Item:
+    async def process(self, ant: 'Ant', thing: Item) -> Item:
         pairs = []
         primary_value = None
 
@@ -266,3 +275,61 @@ class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
                                          primary_key=self.primary_key, primary_value=primary_value)
             await self.push_data(sql)
         return thing
+
+
+class ItemBaseEmailPipeline(Pipeline):
+    def __init__(self, account: str, password: str, server: str, port: int, recipients: List[str],
+                 sender_name: str='AntNest.ItemEmailPipeline', starttls=False):
+        super().__init__()
+        self.account = account
+        self.password = password
+        self.server = server
+        self.port = port
+        self.recipients = recipients
+        self.sender_name = sender_name
+        self.starttls = starttls
+
+    async def open_smtp(self) -> aiosmtplib.SMTP:
+        smtp = aiosmtplib.SMTP()
+        if self.starttls:
+            await smtp.connect(self.server, self.port, use_tls=False)
+            await smtp.starttls()
+        else:
+            await smtp.connect(self.server, self.port)
+        await smtp.login(self.account, self.password)
+        return smtp
+
+    async def send(self, smtp: aiosmtplib.SMTP, title: str, content: str, attachments: Optional[List[IO]]=None):
+        if attachments is None:
+            msg = MIMEText(content)
+        else:
+            msg = MIMEMultipart()
+            msg.attach(MIMEText(content))
+            for f in attachments:
+                att = MIMEText(f.read(), 'base64', 'utf-8')
+                att["Content-Type"] = 'application/octet-stream'
+                att["Content-Disposition"] = 'attachment; filename="{:s}"'.format(f.name)
+                msg.attach(att)
+        msg['From'] = '{:s} <{:s}>'.format(self.sender_name, self.account)
+        msg['To'] = '<' + '> <'.join(self.recipients) + '>'
+        msg['Subject'] = title
+        await smtp.send_message(msg)
+
+
+class ItemEmailPipeline(ItemBaseEmailPipeline):
+    def __init__(self, title, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.items = []
+        self.title = title
+
+    def process(self, ant: 'Ant', thing: Item) -> Item:
+        self.items.append(thing)
+        return thing
+
+    async def on_spider_close(self, ant: 'Ant') -> None:
+        smtp = await self.open_smtp()
+        await self.send(smtp, self.title, '\n'.join(item.__repr__() for item in self.items))
+        smtp.close()
+
+
+__all__ = [var for var in vars().keys() if 'Pipeline' in var]

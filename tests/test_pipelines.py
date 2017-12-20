@@ -106,7 +106,7 @@ def test_item_filed_replace_pipeline():
 async def test_item_json_dump_pipeline():
 
     class Pl(pipelines.ItemJsonDumpPipeline):
-        def dump(self, file_path: str, data: dict):
+        def _dump(self, file_path: str, data: dict):
             pass
 
     class TAnt(ant.Ant):
@@ -121,7 +121,7 @@ async def test_item_json_dump_pipeline():
     item = TItem()
     item.info = 'hi'
     pl.process(a, item)
-    await pl.on_spider_close(a)
+    pl.on_spider_close(a)
 
 
 def test_request_user_agent_pipeline():
@@ -129,3 +129,25 @@ def test_request_user_agent_pipeline():
     req = things.Request('www.hi.com')
     assert pl.process(None, req) is req
     assert req.headers['User-Agent'] == 'ant'
+
+
+@pytest.mark.asyncio
+async def test_item_email_pipeline():
+
+    class TestPipeline(pipelines.ItemEmailPipeline):
+        async def open_smtp(self):
+
+            class FakeSMTP:
+                async def send_message(self, msg):
+                    pass
+
+                def close(self):
+                    pass
+
+            return FakeSMTP()
+
+    pl = TestPipeline('test', 'a@b.c', 'letmein', 'localhost', 25, recipients=['b@a.c', 'c@b.a'])
+    item = TItem(info='hi')
+
+    pl.process(None, item)
+    await pl.on_spider_close(None)
