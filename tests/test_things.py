@@ -1,15 +1,9 @@
 import pickle
 import os
-import asyncio
 
 import pytest
 
-from ant_nest.things import (
-    Request, Response, Item, IntField, FloatField, StringField, FieldValidationError, ItemExtractor, ItemExtractError)
-from ant_nest.pipelines import Pipeline
-from ant_nest.ant import Ant
-from ant_nest import cli
-from ant_nest.exceptions import ThingDropped
+from ant_nest import *
 
 
 def test_request():
@@ -112,38 +106,6 @@ def test_item():
     assert item.a == 1
 
 
-@pytest.mark.asyncio
-async def test_pipelines():
-    class TestAnt(Ant):
-        async def run(self):
-            return None
-
-    pls = [Pipeline() for x in range(10)]
-    thing = Request('test_url')
-    ant = TestAnt()
-    assert thing is await ant._handle_thing_with_pipelines(thing, pls)
-
-    class TestPipeline(Pipeline):
-        async def process(self, ant, thing):
-            return None
-
-    pls[5] = TestPipeline()
-    with pytest.raises(ThingDropped):
-        await ant._handle_thing_with_pipelines(thing, pls)
-
-
-@pytest.mark.asyncio
-async def test_ant():
-    class TestAnt(Ant):
-        async def run(self):
-            await self.request('test.com')
-
-        async def _request(self, req: Request):
-            return Response(req, 200, b'1', {})
-
-    await TestAnt().main()
-
-
 def test_extract():
     class TestItem(Item):
         paragraph = StringField()
@@ -180,7 +142,7 @@ class MAnt(Ant):
 
 
 def test_cli_get_ants():
-    ants = cli.get_ants(['tests'])
+    ants = get_ants(['tests'])
     assert MAnt is list(ants.values())[0]
 
 
@@ -191,47 +153,4 @@ def test_cli_open_browser():
     def open_browser_function(url):
         return True
 
-    assert cli.open_response_in_browser(res, _open_browser_function=open_browser_function)
-
-
-@pytest.mark.asyncio
-async def test_ant_ensure_future():
-
-    class TAnt(Ant):
-
-        def __init__(self, limit):
-            super().__init__()
-            self.CONCURRENT_LIMIT = limit
-            self.count = 0
-            self.max_count = 10
-
-        async def cor(self):
-            self.count += 1
-
-        async def run(self):
-            for i in range(self.max_count):
-                self.ensure_future(self.cor())
-
-    ant = TAnt(3)
-    await ant.main()
-    assert ant.count == ant.max_count
-
-    class ATAnt(TAnt):
-        async def run(self):
-            for c in self.as_completed((self.cor() for i in range(self.max_count))):
-                await c
-
-    ant = ATAnt(3)
-    await ant.main()
-    assert ant.count == ant.max_count
-
-    class TAnt(Ant):
-        COROUTINE_TIMEOUT = 0.1
-
-        async def run(self):
-            for cor in self.as_completed([asyncio.sleep(0.2)]):
-                await cor
-
-    ant = TAnt()
-    with pytest.raises(asyncio.TimeoutError):
-        await ant.run()
+    assert open_response_in_browser(res, _open_browser_function=open_browser_function)

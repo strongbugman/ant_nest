@@ -15,11 +15,10 @@ from .exceptions import FieldValidationError, ItemExtractError
 
 
 class Request:
-    __slots__ = ('url', 'params', 'method', 'headers', 'cookies', 'data', 'proxy', 'max_redirects', 'allow_redirects')
+    __slots__ = ('url', 'params', 'method', 'headers', 'cookies', 'data')
 
     def __init__(self, url: Union[str, URL], method='GET', params: Optional[dict]=None, headers: Optional[dict]=None,
-                 cookies: Optional[dict]=None, data: Optional[Any]=None, proxy: Optional[str]=None,
-                 allow_redirects=True, max_redirects=10):
+                 cookies: Optional[dict]=None, data: Optional[Any]=None):
         if isinstance(url, str):
             url = URL(url)
         self.url = url
@@ -28,9 +27,6 @@ class Request:
         self.headers = headers
         self.cookies = cookies
         self.data = data
-        self.proxy = proxy
-        self.allow_redirects = allow_redirects
-        self.max_redirects = max_redirects
 
     def __repr__(self):
         return '{:s}: {:s} {:s}'.format(self.__class__.__name__, self.method, str(self.url))

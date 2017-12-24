@@ -1,140 +1,97 @@
 import pytest
 
-from yarl import URL
+from ant_nest import *
 
-from ant_nest import pipelines
-from ant_nest import things
-from ant_nest import ant
+
+@pytest.mark.asyncio
+async def test_pipeline():
+    pl = Pipeline()
+    await pl.process(Request(url='test.com'))
 
 
 def test_report_pipeline():
-    pl = pipelines.ReportPipeline()
-    thing = things.Item()
+    pl = ReportPipeline()
+    thing = Item()
     for _ in range(10):
-        assert pl.process(None, thing) is thing
+        assert pl.process(thing) is thing
     assert pl.count == 10
 
 
 def test_response_fileter_error_pipeline():
-    pl = pipelines.ResponseFilterErrorPipeline()
-    res = things.Response(things.Request('http://test.com'), 200, b'')
-    err_res = things.Response(things.Request('http://test.com'), 403, b'')
-    assert res is pl.process(None, res)
-    assert pl.process(None, err_res) is None
-
-
-@pytest.mark.asyncio
-async def test_response_retry_pipeline():
-    pl = pipelines.ResponseRetryPipeline(interval=0)
-    res = things.Response(things.Request('http://test.com'), 200, b'')
-    err_res = things.Response(things.Request('http://test.com'), 403, b'')
-
-    class TAnt(ant.Ant):
-        count = 0
-
-        async def _request(self, req):
-            self.count += 1
-            if self.count == 3:
-                return things.Response(things.Request('http://retry.com'), 200, b'')
-            else:
-                return things.Response(things.Request('http://retryf.com'), 403, b'')
-
-        async def run(self):
-            return None
-
-    a = TAnt()
-    assert await pl.process(a, res) is res
-    assert (await pl.process(a, err_res)).url == URL('http://retry.com')
-
-
-def test_request_no_redirects_pipeline():
-    pl = pipelines.RequestNoRedirectsPipeline()
-    req = things.Request('http://test.com')
-    assert pl.process(None, req) is req
-    assert not req.allow_redirects
-    assert req.max_redirects == 0
-
-
-def test_request_proxy_pipeline():
-    proxy = 'http://user:pwd@localhost:3128'
-    pl = pipelines.RequestProxyPipeline(proxy)
-    req = things.Request('http://test.com')
-    assert pl.process(None, req) is req
-    assert req.proxy == proxy
+    pl = ResponseFilterErrorPipeline()
+    res = Response(Request('http://test.com'), 200, b'')
+    err_res = Response(Request('http://test.com'), 403, b'')
+    assert res is pl.process(res)
+    assert pl.process(err_res) is None
 
 
 def test_request_duplicate_filter_pipeline():
-    pl = pipelines.RequestDuplicateFilterPipeline()
-    req = things.Request('http://test.com')
-    assert pl.process(None, req) is req
-    assert pl.process(None, req) is None
+    pl = RequestDuplicateFilterPipeline()
+    req = Request('http://test.com')
+    assert pl.process(req) is req
+    assert pl.process(req) is None
 
 
-class TItem(things.Item):
-    count = things.IntField()
-    info = things.StringField()
+class TItem(Item):
+    count = IntField()
+    info = StringField()
 
 
 def test_item_print_pipeline():
-    pl = pipelines.ItemPrintPipeline()
+    pl = ItemPrintPipeline()
     item = TItem()
     item.count = 3
     item.info = 'hi'
-    assert pl.process(None, item) is item
+    assert pl.process(item) is item
 
 
 def test_item_validate_pipeline():
-    pl = pipelines.ItemValidatePipeline()
+    pl = ItemValidatePipeline()
     item = TItem()
     item.count = '3'
-    assert pl.process(None, item) is None
+    assert pl.process(item) is None
 
     item.info = 'hi'
-    pl.process(None, item)
+    pl.process(item)
     assert item.count == 3
 
 
 def test_item_filed_replace_pipeline():
-    pl = pipelines.ItemFieldReplacePipeline(['info'])
+    pl = ItemFieldReplacePipeline(['info'])
     item = TItem()
     item.info = 'hi\n,\t\r ant\n'
-    pl.process(None, item)
+    pl.process(item)
     assert item.info == 'hi, ant'
 
 
 @pytest.mark.asyncio
 async def test_item_json_dump_pipeline():
 
-    class Pl(pipelines.ItemJsonDumpPipeline):
+    class Pl(ItemJsonDumpPipeline):
         def _dump(self, file_path: str, data: dict):
             pass
 
-    class TAnt(ant.Ant):
-        async def run(self):
-            pass
-
     pl = Pl()
-    a = TAnt()
     item = TItem()
     item.count = 1
-    assert pl.process(a, item) is item
+    assert pl.process(item) is item
     item = TItem()
     item.info = 'hi'
-    pl.process(a, item)
-    pl.on_spider_close(a)
+    pl.process(item)
+    pl.on_spider_close()
 
 
 def test_request_user_agent_pipeline():
-    pl = pipelines.RequestUserAgentPipeline(user_agent='ant')
-    req = things.Request('www.hi.com')
-    assert pl.process(None, req) is req
+    pl = RequestUserAgentPipeline(user_agent='ant')
+    req = Request('www.hi.com')
+    assert pl.process(req) is req
     assert req.headers['User-Agent'] == 'ant'
 
 
 @pytest.mark.asyncio
 async def test_item_email_pipeline():
 
-    class TestPipeline(pipelines.ItemEmailPipeline):
+    class TestPipeline(ItemEmailPipeline):
         async def open_smtp(self):
 
             class FakeSMTP:
@@ -149,5 +106,5 @@ async def test_item_email_pipeline():
     pl = TestPipeline('test', 'a@b.c', 'letmein', 'localhost', 25, recipients=['b@a.c', 'c@b.a'])
     item = TItem(info='hi')
 
-    pl.process(None, item)
-    await pl.on_spider_close(None)
+    pl.process(item)
+    await pl.on_spider_close()

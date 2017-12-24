@@ -3,4 +3,4 @@ python:
   - "3.6"
 install:
   - python setup.py install
-script: pytest
+script: pytest tests/test_ant.py tests/test_queen.py tests/test_pipelines.py tests/test_things.py

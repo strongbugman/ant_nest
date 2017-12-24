@@ -13,6 +13,10 @@ import tempfile
 
 from .ant import Ant
 from .things import Response
+from . import queen
+
+
+__all__ = ['get_ants', 'run_ant', 'open_response_in_browser']
 
 
 def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
@@ -42,8 +46,10 @@ def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
 
 
 async def run_ant(ant_cls: Type[Ant]):
+    queen.init_loop(loop=asyncio.get_event_loop())
     ant = ant_cls()
     await ant.main()
+    await queen.wait_scheduled_coroutines()
 
 
 def open_response_in_browser(response: Response, file_type: str='.html',
@@ -80,7 +86,10 @@ def main():
     elif args.ant is not None:
         ant_name = args.ant
         if ant_name in ants:
-            asyncio.get_event_loop().run_until_complete(run_ant(ants[ant_name]))
+            loop = getattr(settings, 'EVENT_LOOP', asyncio.get_event_loop())
+            limit = getattr(settings, 'COROUTINE_CONCURRENT_LIMIT', None)
+            queen.reset_concurrent_limit(limit)
+            loop.run_until_complete(run_ant(ants[ant_name]))
         else:
             print('Can not find ant by the name "{:s}"'.format(ant_name))
             exit(-1)

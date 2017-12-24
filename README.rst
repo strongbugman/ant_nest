@@ -41,9 +41,7 @@ Usage
 
 Let`s take a look, create book.py first::
 
-    from ant_nest.ant import Ant
-    from ant_nest.things import StringField, IntField ItemExtractor
-    from ant_nest.pipelines import *
+    from ant_nest import *
 
     # define a item structure we want to crawl
     class BookItem(Item):
@@ -56,13 +54,15 @@ Let`s take a look, create book.py first::
 
     # define our ant
     class BookAnt(Ant):
+        request_retry_delay = 10
+        request_allow_redirects = False
         # the things(request, response, item) will pass through pipelines in order, pipelines can change or drop them
         item_pipelines = [ItemValidatePipeline(),
                           ItemMysqlInsertPipeline(settings.MYSQL_HOST, settings.MYSQL_PORT, settings.MYSQL_USER,
                                                   settings.MYSQL_PASSWORD, settings.MYSQL_DATABASE, 'book'),
                           ReportPipeline()]
         request_pipelines = [RequestDuplicateFilterPipeline(), RequestUserAgentPipeline(), ReportPipeline()]
-        response_pipelines = [ResponseRetryPipeline(), ResponseFilterErrorPipeline(), ReportPipeline()]
+        response_pipelines = [ResponseFilterErrorPipeline(), ReportPipeline()]
 
 
         # define ItemExtractor to extract item field by xpath from response(html source code)
@@ -89,8 +89,9 @@ Let`s take a look, create book.py first::
             urls = response.html_element.xpath('//a[@class="single_book"]/@href')
             # run "crawl_book" coroutines in concurrent
             for url in urls:
-                # "self.ensure_future" is a method like "ensure_future" in "asyncio", but it provide something else
-                self.ensure_future(self.crawl_book(url))
+                # "queen.schedule_coroutine" is a function like "ensure_future" in "asyncio",
+                # but it provide something else
+                queen.schedule_coroutine(self.crawl_book(url))
 
 Create a settings.py::
 

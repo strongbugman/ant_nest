@@ -1,8 +1,7 @@
-from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, TYPE_CHECKING
+from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO
 import logging
 from collections import defaultdict
 import json
-import asyncio
 import os
 import time
 import datetime
@@ -14,21 +13,20 @@ import aiosmtplib
 
 from .things import Things, Response, Request, Item
 from .exceptions import FieldValidationError
-if TYPE_CHECKING:
-    from ant_nest.ant import Ant
+from . import queen
 
 
 class Pipeline:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def on_spider_open(self, ant: 'Ant') -> None:
+    async def on_spider_open(self) -> None:
         """Call when ant open, method or coroutine"""
 
-    async def on_spider_close(self, ant: 'Ant') -> None:
+    async def on_spider_close(self) -> None:
         """Call when ant close, method or coroutine"""
 
-    async def process(self, ant: 'Ant', thing: Things) -> Optional[Things]:
+    async def process(self, thing: Things) -> Optional[Things]:
         """method or coroutine"""
         return thing
 
@@ -41,7 +39,7 @@ class ReportPipeline(Pipeline):
         self.last_count = 0
         super().__init__()
 
-    def process(self, ant: 'Ant', thing: Things) -> Things:
+    def process(self, thing: Things) -> Things:
         if self.report_type is None:
             self.report_type = thing.__class__.__name__
         self.count += 1
@@ -53,14 +51,14 @@ class ReportPipeline(Pipeline):
             self.last_count = self.count
         return thing
 
-    def on_spider_close(self, ant: 'Ant'):
+    def on_spider_close(self):
         if self.report_type is not None:
             self.logger.info('Get {:d} {:s} in total'.format(self.count, self.report_type))
 
 
 # Response pipelines
 class ResponseFilterErrorPipeline(Pipeline):
-    def process(self, ant: 'Ant', thing: Response) -> Optional[Response]:
+    def process(self, thing: Response) -> Optional[Response]:
         if thing.status >= 400:
             self.logger.warning('Response: {:s} has bean dropped'.format(str(thing)))
             return None
@@ -68,51 +66,13 @@ class ResponseFilterErrorPipeline(Pipeline):
             return thing
 
 
-class ResponseRetryPipeline(Pipeline):
-    """This pipeline should be in front of the pipeline chain"""
-    def __init__(self, retries: int=3, interval: int=3):
-        self.retries = retries
-        self.interval = interval
-        super().__init__()
-
-    async def process(self, ant: 'Ant', thing: Response) -> Optional[Response]:
-        retries = self.retries
-        while retries >= 0:
-            if thing.status >= 400:
-                self.logger.info('Retry {:s} because http status {:d}'.format(str(thing.request), thing.status))
-                await asyncio.sleep(self.interval)
-                thing = await ant._request(thing.request)
-            else:
-                return thing
-            retries -= 1
-        self.logger.warning('{:d} reties failed for {:s}'.format(self.retries, str(thing)))
-        return thing
-
-
 # Request pipelines
-class RequestNoRedirectsPipeline(Pipeline):
-    def process(self, ant: 'Ant', thing: Request) -> Request:
-        thing.allow_redirects = False
-        thing.max_redirects = 0
-        return thing
-
-
-class RequestProxyPipeline(Pipeline):
-    def __init__(self, proxy: str):
-        self.proxy = proxy
-        super().__init__()
-
-    def process(self, ant: 'Ant', thing: Request) -> Request:
-        thing.proxy = self.proxy
-        return thing
-
-
 class RequestDuplicateFilterPipeline(Pipeline):
     def __init__(self):
         self.__request_urls = set()
         super().__init__()
 
-    def process(self, ant: 'Ant', thing: Request) -> Optional[Request]:
+    def process(self, thing: Request) -> Optional[Request]:
         if thing.url in self.__request_urls:
             return None
         else:
@@ -128,7 +88,7 @@ class RequestUserAgentPipeline(Pipeline):
         super().__init__()
         self.user_agent = user_agent
 
-    def process(self, ant, thing):
+    def process(self, thing):
         if thing.headers is None:
             thing.headers = {}
         thing.headers['User-Agent'] = self.user_agent
@@ -137,13 +97,13 @@ class RequestUserAgentPipeline(Pipeline):
 
 # Item pipelines
 class ItemPrintPipeline(Pipeline):
-    def process(self, ant: 'Ant', thing: Item) -> Item:
+    def process(self, thing: Item) -> Item:
         self.logger.info(str(thing))
         return thing
 
 
 class ItemValidatePipeline(Pipeline):
-    def process(self, ant: 'Ant', thing: Item) -> Optional[Item]:
+    def process(self, thing: Item) -> Optional[Item]:
         try:
             thing.validate()
             return thing
@@ -157,7 +117,7 @@ class ItemFieldReplacePipeline(Pipeline):
         self.excess_chars = excess_chars
         super().__init__()
 
-    def process(self, ant: 'Ant', thing: Item) -> Item:
+    def process(self, thing: Item) -> Item:
         for field in self.fields:
             for char in self.excess_chars:
                 if field in thing and isinstance(thing[field], str):
@@ -171,8 +131,8 @@ class ItemBaseJsonDumpPipeline(Pipeline):
         with open(file_path, 'w') as f:
             json.dump(data, f)
 
-    def dump(self, ant: 'Ant', file_path: str, data: Dict) -> None:
-        ant.ensure_future(asyncio.get_event_loop().run_in_executor(None, self._dump, file_path, data))
+    def dump(self, file_path: str, data: Dict) -> None:
+        queen.schedule_coroutine(queen.get_loop().run_in_executor(None, self._dump, file_path, data))
 
 
 class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
@@ -181,13 +141,13 @@ class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
         self.file_dir = file_dir
         self.data = defaultdict(list)  # type: DefaultDict[str, List[Dict]]
 
-    def process(self, ant: 'Ant', thing: Item) -> Item:
+    def process(self, thing: Item) -> Item:
         self.data[thing.__class__.__name__].append(dict(thing))
         return thing
 
-    def on_spider_close(self, ant: 'Ant') -> None:
+    def on_spider_close(self) -> None:
         for file_name, data in self.data.items():
-            self.dump(ant, os.path.join(self.file_dir, file_name + '.json'), data)
+            self.dump(os.path.join(self.file_dir, file_name + '.json'), data)
 
 
 class ItemBaseMysqlPipeline(Pipeline):
@@ -202,11 +162,11 @@ class ItemBaseMysqlPipeline(Pipeline):
         self.charset = charset
         self.pool = None
 
-    async def on_spider_open(self, ant: 'Ant') -> None:
+    async def on_spider_open(self) -> None:
         self.pool = await aiomysql.create_pool(host=self.host, port=self.port, user=self.user, password=self.password,
                                                db=self.database, charset=self.charset, use_unicode=True)
 
-    def on_spider_close(self, ant: 'Ant') -> None:
+    def on_spider_close(self) -> None:
         self.pool.close()
 
     async def push_data(self, sql: str) -> None:
@@ -240,7 +200,7 @@ class ItemBaseMysqlPipeline(Pipeline):
 class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
     sql_format = 'INSERT IGNORE INTO {database}.{table} ({fields}) VALUES ({values})'
 
-    async def process(self, ant: 'Ant', thing: Item):
+    async def process(self, thing: Item):
         fields = []
         values = []
         for k, v in thing.items():
@@ -260,7 +220,7 @@ class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
         super().__init__(host, port, user, password, database, table, charset=charset)
         self.primary_key = primary_key
 
-    async def process(self, ant: 'Ant', thing: Item) -> Item:
+    async def process(self, thing: Item) -> Item:
         pairs = []
         primary_value = None
 
@@ -322,11 +282,11 @@ class ItemEmailPipeline(ItemBaseEmailPipeline):
         self.items = []
         self.title = title
 
-    def process(self, ant: 'Ant', thing: Item) -> Item:
+    def process(self, thing: Item) -> Item:
         self.items.append(thing)
         return thing
 
-    async def on_spider_close(self, ant: 'Ant') -> None:
+    async def on_spider_close(self) -> None:
         smtp = await self.open_smtp()
         await self.send(smtp, self.title, '\n'.join(item.__repr__() for item in self.items))
         smtp.close()
