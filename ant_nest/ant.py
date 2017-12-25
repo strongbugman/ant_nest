@@ -40,10 +40,7 @@ class Ant(abc.ABC):
     async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None,
                       headers: Optional[dict]=None, cookies: Optional[dict]=None, data: Optional[Any]=None,
                       ) -> Response:
-        kwargs = locals()
-        kwargs.pop('self')
-
-        req = Request(**kwargs)
+        req = Request(url, method=method, params=params, headers=headers, cookies=cookies, data=data)
         req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=self.request_timeout)
 
         retries = self.request_retries
