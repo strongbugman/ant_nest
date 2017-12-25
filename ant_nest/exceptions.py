@@ -1,4 +1,4 @@
-__all__ = ['ThingDropped', 'FieldValidationError', 'ItemExtractError']
+__all__ = ['ThingDropped', 'FieldValidationError', 'ItemExtractError', 'QueenError']
 
 
 class ThingDropped(Exception):
@@ -11,3 +11,7 @@ class FieldValidationError(Exception):
 
 class ItemExtractError(Exception):
     """For extract item"""
+
+
+class QueenError(Exception):
+    """For "queen" module"""

@@ -10,6 +10,8 @@ from itertools import islice
 import async_timeout
 from aiohttp.client import DEFAULT_TIMEOUT
 
+from .exceptions import QueenError
+
 logger = logging.getLogger(__name__)
 __queue = None  # type: typing.Optional[Queue]
 __done_queue = None  # type: typing.Optional[Queue]
@@ -25,12 +27,14 @@ __all__ = ['init_loop', 'reset_concurrent_limit', 'get_loop', 'timeout_wrapper',
 
 
 def init_loop(loop: typing.Optional[asyncio.AbstractEventLoop]=None) -> None:
+    """Set event loop and coroutines queue for "schedule_coroutine" function"""
     global __queue, __done_queue, __loop
     if loop is None:
         loop = asyncio.get_event_loop()
 
     if __loop is not None:
-        logger.warning('My event loop has been replaced, Make sure the queues is clean!')
+        if __running_count > 0 or __done_queue.qsize() > 0 or __queue.qsize() > 0:
+            raise QueenError('Replace Event loop with uncleaned coroutines')
 
     __loop = loop
     __queue = Queue(loop=__loop)

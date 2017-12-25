@@ -4,6 +4,7 @@ from asyncio.unix_events import _UnixSelectorEventLoop
 import pytest
 
 from ant_nest import queen
+from ant_nest.exceptions import *
 
 
 @pytest.yield_fixture()
@@ -92,3 +93,21 @@ async def test_timeout():
 
     with pytest.raises(asyncio.TimeoutError):
         await queen.timeout_wrapper(bar(), timeout=0.2)
+
+
+@pytest.mark.asyncio
+async def test_reinit():
+    async def cor():
+        pass
+
+    queen.init_loop(loop=asyncio.get_event_loop())
+    assert asyncio.get_event_loop() is queen.get_loop()
+
+    loop = _UnixSelectorEventLoop()
+    queen.init_loop(loop=loop)
+    assert queen.get_loop() is loop
+
+    queen.schedule_coroutine(cor())
+
+    with pytest.raises(QueenError):
+        queen.init_loop(loop=asyncio.get_event_loop())

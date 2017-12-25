@@ -78,7 +78,7 @@ async def test_item_json_dump_pipeline():
     item = TItem()
     item.info = 'hi'
     pl.process(item)
-    pl.on_spider_close()
+    await pl.on_spider_close()
 
 
 def test_request_user_agent_pipeline():

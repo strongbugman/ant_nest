@@ -8,6 +8,8 @@ from ant_nest import *
 @pytest.mark.asyncio
 async def test_ant():
     class TestAnt(Ant):
+        request_retries = 0
+
         async def run(self):
             await self.request('test.com')
 

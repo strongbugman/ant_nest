@@ -7,13 +7,13 @@ import time
 import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import asyncio
 
 import aiomysql
 import aiosmtplib
 
 from .things import Things, Response, Request, Item
 from .exceptions import FieldValidationError
-from . import queen
 
 
 class Pipeline:
@@ -131,8 +131,8 @@ class ItemBaseJsonDumpPipeline(Pipeline):
         with open(file_path, 'w') as f:
             json.dump(data, f)
 
-    def dump(self, file_path: str, data: Dict) -> None:
-        queen.schedule_coroutine(queen.get_loop().run_in_executor(None, self._dump, file_path, data))
+    async def dump(self, file_path: str, data: Dict) -> None:
+        await asyncio.get_event_loop().run_in_executor(None, self._dump, file_path, data)
 
 
 class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
@@ -145,9 +145,9 @@ class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
         self.data[thing.__class__.__name__].append(dict(thing))
         return thing
 
-    def on_spider_close(self) -> None:
+    async def on_spider_close(self) -> None:
         for file_name, data in self.data.items():
-            self.dump(os.path.join(self.file_dir, file_name + '.json'), data)
+            await self.dump(os.path.join(self.file_dir, file_name + '.json'), data)
 
 
 class ItemBaseMysqlPipeline(Pipeline):
