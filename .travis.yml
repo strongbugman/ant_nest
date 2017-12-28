@@ -1,6 +1,16 @@
 language: python
 python:
   - "3.6"
+services:
+  - mysql
+env:
+  - TEST_MYSQL_SERVER="127.0.0.1"
+  - TEST_MYSQL_PORT=3306
+  - TEST_MYSQL_USER=travis
+  - TEST_MYSQL_PASSWORD=""
+  - TEST_MYSQL_DATABASE=test
+before_install:
+  - mysql -e 'CREATE DATABASE IF NOT EXISTS test;'
 install:
   - python setup.py install
 script: pytest
