@@ -80,7 +80,6 @@ class Ant(abc.ABC):
         try:
             await self.open()
             await self.run()
-            await self.close()
         except Exception as e:
             self.logger.exception('Run main coroutine with ' + e.__class__.__name__)
 

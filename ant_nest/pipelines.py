@@ -166,18 +166,25 @@ class ItemBaseMysqlPipeline(Pipeline):
         self.pool = await aiomysql.create_pool(host=self.host, port=self.port, user=self.user, password=self.password,
                                                db=self.database, charset=self.charset, use_unicode=True)
 
-    def on_spider_close(self) -> None:
+    async def on_spider_close(self) -> None:
         self.pool.close()
+        await self.pool.wait_closed()
 
     async def push_data(self, sql: str) -> None:
+        """Run SQL without pulling data like "INSERT" and "UPDATE" command"""
         self.logger.debug('Executing SQL: ' + sql)
         async with self.pool.get() as conn:
-            try:
-                async with conn.cursor() as cur:
-                    await cur.execute(sql)
-                await conn.commit()
-            except Exception as e:
-                self.logger.exception('Push data with ' + e.__class__.__name__)
+            async with conn.cursor() as cur:
+                await cur.execute(sql)
+            await conn.commit()
+
+    async def pull_data(self, sql: str) -> Tuple[Dict[str, Any]]:
+        """Run SQL with pulling data like "SELECT" command"""
+        self.logger.debug('Executing SQL: ' + sql)
+        async with self.pool.get() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute(sql)
+                return await cur.fetchall()
 
     @staticmethod
     def convert_item_value(value: Any) -> str:

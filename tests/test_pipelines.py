@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from ant_nest import *
@@ -66,12 +68,7 @@ def test_item_filed_replace_pipeline():
 
 @pytest.mark.asyncio
 async def test_item_json_dump_pipeline():
-
-    class Pl(ItemJsonDumpPipeline):
-        def _dump(self, file_path: str, data: dict):
-            pass
-
-    pl = Pl()
+    pl = ItemJsonDumpPipeline()
     item = TItem()
     item.count = 1
     assert pl.process(item) is item
@@ -79,6 +76,7 @@ async def test_item_json_dump_pipeline():
     item.info = 'hi'
     pl.process(item)
     await pl.on_spider_close()
+    os.remove('./Titem.json')
 
 
 def test_request_user_agent_pipeline():
@@ -108,3 +106,48 @@ async def test_item_email_pipeline():
 
     pl.process(item)
     await pl.on_spider_close()
+
+
+@pytest.mark.asyncio
+async def test_item_mysql_pipeline():
+    mysql_server = os.getenv('TEST_MYSQL_SERVER', 'localhost')
+    mysql_port = int(os.getenv('TEST_MYSQL_PORT', 3306))
+    mysql_user = os.getenv('TEST_MYSQL_USER', 'root')
+    mysql_password = os.getenv('TEST_MYSQL_PASSWORD', 'letmein')
+    mysql_database = os.getenv('TEST_MYSQL_DATABASE)', 'test')
+
+    bpl = ItemBaseMysqlPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
+                                database=mysql_database, table='test')
+    await bpl.on_spider_open()
+    await bpl.push_data('DROP TABLE IF EXISTS test;')
+    await bpl.push_data('''CREATE TABLE `test` (
+                           `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+                           `test` text DEFAULT NULL,
+                           PRIMARY KEY (`id`)
+                           ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;''')
+
+    test_item = Item(test='I ant')
+    ibpl = ItemMysqlInsertPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
+                                   database=mysql_database, table='test')
+    await ibpl.on_spider_open()
+    assert test_item is await ibpl.process(test_item)
+    data = await ibpl.pull_data('SELECT * FROM test')
+    assert test_item.test == data[0]['test']
+
+    ubpl = ItemMysqlUpdatePipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
+                                   database=mysql_database, table='test', primary_key='id')
+    await ubpl.on_spider_open()
+    test_item.id = data[0]['id']
+    test_item.test = 'I ANT'
+    assert test_item is await ubpl.process(test_item)
+    data = await ubpl.pull_data('SELECT * FROM test')
+    assert test_item.test == data[0]['test']
+    test_item.test = 'I ant'
+    assert test_item is await ubpl.process(test_item)
+    data = await ubpl.pull_data('SELECT * FROM test')
+    assert test_item.test == data[0]['test']
+
+    await ubpl.on_spider_close()
+    await ibpl.on_spider_close()
+    await bpl.push_data('DROP TABLE test;')
+    await bpl.on_spider_close()
