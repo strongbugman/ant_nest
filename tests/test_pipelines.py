@@ -76,7 +76,11 @@ async def test_item_json_dump_pipeline():
     item.info = 'hi'
     pl.process(item)
     await pl.on_spider_close()
-    os.remove('./Titem.json')
+
+    # clean file
+    ci = os.getenv('CI', 'localhost')
+    if ci == 'localhost':
+        os.remove('./Titem.json')
 
 
 def test_request_user_agent_pipeline():
