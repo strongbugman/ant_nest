@@ -16,7 +16,9 @@ async def test_ant():
         async def _request(self, req: Request):
             return Response(req, 200, b'1', {})
 
-    await TestAnt().main()
+    ant = TestAnt()
+    await ant.main()
+    await ant.close()
 
 
 @pytest.mark.asyncio
