@@ -123,7 +123,6 @@ async def test_item_mysql_pipeline():
     bpl = ItemBaseMysqlPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
                                 database=mysql_database, table='test')
     await bpl.on_spider_open()
-    await bpl.push_data('DROP TABLE IF EXISTS test;')
     await bpl.push_data('''CREATE TABLE `test` (
                            `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
                            `test` text DEFAULT NULL,

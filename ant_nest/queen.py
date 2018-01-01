@@ -107,14 +107,12 @@ async def wait_scheduled_coroutines():
         await __done_queue.get()
 
 
-def as_completed(coroutines: typing.Union[typing.Iterator[typing.Coroutine], typing.List[typing.Coroutine]],
-                 limit: int=__concurrent_limit, timeout: float=__timeout,
+def as_completed(coroutines: typing.Iterable[typing.Coroutine], limit: int=__concurrent_limit, timeout: float=__timeout,
                  loop: typing.Optional[asyncio.AbstractEventLoop]=None
                  )-> typing.Generator[typing.Coroutine, None, None]:
     """Custom as_completed method provide coroutines concurrent limit,
     the "limit" is not shared with "schedule_coroutine" function"""
-    if isinstance(coroutines, typing.List):
-        coroutines = iter(coroutines)
+    coroutines = iter(coroutines)
 
     queue = Queue(loop=loop)
     todo = []
@@ -142,5 +140,20 @@ def as_completed(coroutines: typing.Union[typing.Iterator[typing.Coroutine], typ
         f.add_done_callback(_done_callback)
         todo.append(f)
 
-    while len(todo) > 0:
+    while len(todo) > 0 or queue.qsize() > 0:
         yield _wait_for_one()
+
+
+async def as_completed_with_async(
+        coroutines: typing.Iterable[typing.Coroutine],
+        limit: int=__concurrent_limit, timeout: float=__timeout, ignore_exception: bool=True,
+        )-> typing.AsyncGenerator[typing.Any, None]:
+    """as_completed`s async version, catch and log exception inside"""
+    for coro in as_completed(coroutines, limit=limit, timeout=timeout, loop=asyncio.get_event_loop()):
+        try:
+            yield await coro
+        except Exception as e:
+            if ignore_exception:
+                logger.exception(e)
+            else:
+                raise e

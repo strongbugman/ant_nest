@@ -55,6 +55,15 @@ async def test_as_completed(event_loop):
     count = 3
 
     async def cor(i):
+        return i
+
+    right_result = 0
+    for c in queen.as_completed((cor(i) for i in range(count))):
+        await c
+        right_result += 1
+    assert right_result == count
+
+    async def cor(i):
         await asyncio.sleep(i * 0.1)
         return i
 
@@ -63,6 +72,7 @@ async def test_as_completed(event_loop):
         result = await c
         assert result == right_result
         right_result += 1
+    assert right_result == count
 
     # with limit
     right_result = 2  # 2, 1, 0
@@ -70,6 +80,7 @@ async def test_as_completed(event_loop):
         result = await c
         assert result == right_result
         right_result -= 1
+    assert right_result == -1
 
 
 def test_get_loop():
@@ -103,11 +114,38 @@ async def test_reinit():
     queen.init_loop(loop=asyncio.get_event_loop())
     assert asyncio.get_event_loop() is queen.get_loop()
 
+    queen.schedule_coroutine(cor())
+    with pytest.raises(QueenError):
+        queen.init_loop(loop=asyncio.get_event_loop())
+    await queen.wait_scheduled_coroutines()
+
     loop = _UnixSelectorEventLoop()
     queen.init_loop(loop=loop)
     assert queen.get_loop() is loop
 
-    queen.schedule_coroutine(cor())
 
-    with pytest.raises(QueenError):
-        queen.init_loop(loop=asyncio.get_event_loop())
+@pytest.mark.asyncio
+async def test_as_completed_with_async():
+    queen.init_loop(loop=asyncio.get_event_loop())
+
+    async def cor(x):
+        if x < 0:
+            raise Exception('Test exception')
+        return x
+
+    result_sum = 0
+    async for result in queen.as_completed_with_async((cor(i) for i in range(5))):
+        result_sum += result
+    assert result_sum == sum(range(5))
+
+    result_sum = 0
+    async for result in queen.as_completed_with_async((cor(i - 2) for i in range(5))):
+        result_sum += result
+    assert result_sum == sum(range(3))
+
+    async for result in queen.as_completed_with_async([cor(-1)]):
+        raise Exception('This loop should not be entered!')
+
+    with pytest.raises(Exception):
+        async for result in queen.as_completed_with_async([cor(-1)], ignore_exception=False):
+            pass
