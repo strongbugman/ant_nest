@@ -1,15 +1,17 @@
 """The thing`s usage is simple, can be created by ant, processed by ants and pipelines"""
-from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, DefaultDict
+from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, DefaultDict, AnyStr, IO
 from collections.abc import MutableMapping
 import json
 import abc
 from collections import defaultdict
 import logging
 import re
+from multidict import CIMultiDictProxy
 
 from lxml import html
 from yarl import URL
 import jpath
+from aiohttp.backport_cookies import SimpleCookie
 
 from .exceptions import FieldValidationError, ItemExtractError
 
@@ -18,7 +20,7 @@ class Request:
     __slots__ = ('url', 'params', 'method', 'headers', 'cookies', 'data')
 
     def __init__(self, url: Union[str, URL], method='GET', params: Optional[dict]=None, headers: Optional[dict]=None,
-                 cookies: Optional[dict]=None, data: Optional[Any]=None):
+                 cookies: Optional[dict]=None, data: Optional[Union[AnyStr, Dict, IO]]=None):
         if isinstance(url, str):
             url = URL(url)
         self.url = url
@@ -36,8 +38,8 @@ class Response:
     __slots__ = ('url', 'status', 'headers', 'cookies', 'encoding', 'content', '_text', 'request', '_html_element',
                  '_json')
 
-    def __init__(self, request: Request, status: int, content: bytes, headers: Optional[dict]=None,
-                 cookies: Optional[dict]=None, encoding: str='utf-8'):
+    def __init__(self, request: Request, status: int, content: bytes, headers: CIMultiDictProxy,
+                 cookies: SimpleCookie, encoding: str='utf-8'):
         self.request = request
         self.url = request.url
         self.status = status
@@ -203,6 +205,9 @@ class Item(MutableMapping, metaclass=ItemMeta):
 
     def __repr__(self):
         return '{:s}: {:s}'.format(self.__class__.__name__, str(dict(self)))
+
+    def __str__(self):
+        return '{:s}'.format(self.__class__.__name__)
 
 
 Things = Union[Request, Response, Item]

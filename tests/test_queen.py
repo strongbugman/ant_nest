@@ -23,7 +23,6 @@ async def test_schedule_coroutine():
         nonlocal count
         count += 1
 
-    queen.init_loop(loop=asyncio.get_event_loop())
     queen.reset_concurrent_limit(30)
     queen.schedule_coroutines((cor() for i in range(max_count)))
     await queen.wait_scheduled_coroutines()
@@ -49,6 +48,19 @@ async def test_schedule_coroutine():
     assert count == max_count
     assert max_running_count <= concurrent_limit
 
+    # test with exception
+    count = 0
+    max_count = 3
+
+    async def coro():
+        nonlocal count
+        count += 1
+        raise Exception('Test exception')
+
+    queen.schedule_coroutines(coro() for i in range(max_count))
+    await queen.wait_scheduled_coroutines()
+    assert count == max_count
+
 
 @pytest.mark.asyncio
 async def test_as_completed(event_loop):
@@ -68,7 +80,7 @@ async def test_as_completed(event_loop):
         return i
 
     right_result = 0  # 0, 1, 2
-    for c in queen.as_completed((cor(i) for i in reversed(range(count))), loop=event_loop):
+    for c in queen.as_completed((cor(i) for i in reversed(range(count))), loop=event_loop, limit=-1):
         result = await c
         assert result == right_result
         right_result += 1

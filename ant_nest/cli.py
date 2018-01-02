@@ -49,12 +49,6 @@ async def run_ant(ant_cls: Type[Ant]):
     queen.init_loop(loop=asyncio.get_event_loop())
     ant = ant_cls()
     await ant.main()
-    await queen.wait_scheduled_coroutines()
-    try:
-        await ant.close()
-    except Exception as e:
-        ant.logger.exception('Run close coroutine with ' + e.__class__.__name__)
-    await queen.wait_scheduled_coroutines()
 
 
 def open_response_in_browser(response: Response, file_type: str='.html',

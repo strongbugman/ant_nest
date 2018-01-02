@@ -3,14 +3,21 @@ python:
 - '3.6'
 services:
 - mysql
+- docker
 env:
 - CI=TRAVIS TEST_MYSQL_SERVER="127.0.0.1" TEST_MYSQL_PORT=3306 TEST_MYSQL_USER=travis
   TEST_MYSQL_PASSWORD="" TEST_MYSQL_DATABASE=test
 before_install:
-- mysql -e 'CREATE DATABASE IF NOT EXISTS test;'
+- mysql -e 'DROP DATABASE IF EXISTS test;'
+- mysql -e 'CREATE DATABASE test;'
+- docker pull kennethreitz/httpbin
+- docker run -d -p 8080:8080 httpbin
 install:
 - python setup.py install
-script: pytest
+- pip install codecov
+script: pytest --cov=./
+after_success:
+- codecov
 deploy:
   provider: pypi
   user: bugboy
