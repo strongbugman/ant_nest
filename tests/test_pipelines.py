@@ -85,7 +85,7 @@ async def test_item_json_dump_pipeline():
     await pl.on_spider_close()
 
     # clean file
-    ci = os.getenv('CI', 'localhost')
+    ci = os.getenv('TEST_HOST', 'localhost')
     if ci == 'localhost':
         os.remove('./Titem.json')
 
