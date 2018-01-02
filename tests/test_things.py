@@ -1,6 +1,7 @@
-import pickle
 import os
+from multidict import CIMultiDictProxy, CIMultiDict
 
+from aiohttp.backport_cookies import SimpleCookie
 import pytest
 
 from ant_nest import *
@@ -9,28 +10,13 @@ from ant_nest import *
 def test_request():
     req = Request('http://test.com')
     assert req.method == 'GET'
-    file_path = './tests/req'
-    with open(file_path, 'wb') as f:
-        pickle.dump(req, f)
-    with open(file_path, 'rb') as f:
-        req_l = pickle.load(f)
-    assert req.url == req_l.url
-    os.remove(file_path)
 
 
 def test_response():
     req = Request('http://test.com')
-    res = Response(req, 200, b'1', {})
+    res = Response(req, 200, b'1', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
     assert res.text == '1'
     assert res.json == 1
-    file_path = './tests/res'
-    with open(file_path, 'wb') as f:
-        pickle.dump(res, f)
-    with open(file_path, 'rb') as f:
-        res_l = pickle.load(f)
-    assert res.url == res_l.url
-    assert res.request.url == res_l.request.url
-    os.remove(file_path)
 
 
 def test_field():
@@ -113,7 +99,7 @@ def test_extract():
 
     request = Request(url='https://www.python.org/')
     with open('./tests/test.html', 'rb') as f:
-        response = Response(request, 200, f.read())
+        response = Response(request, 200, f.read(), CIMultiDictProxy(CIMultiDict()), SimpleCookie())
 
     item_extractor = ItemExtractor(TestItem)
     item_extractor.add_xpath('paragraph', '/html/body/div/p/text()')
@@ -129,7 +115,7 @@ def test_extract():
     class TestItem(Item):
         author = StringField()
 
-    response = Response(request, 200, b'{"a": {"b": {"c": 1}}}')
+    response = Response(request, 200, b'{"a": {"b": {"c": 1}}}', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
     item_extractor = ItemExtractor(TestItem)
     item_extractor.add_jpath('author', 'a.b.c')
     item = item_extractor.extract(response)
@@ -148,7 +134,7 @@ def test_cli_get_ants():
 
 def test_cli_open_browser():
     req = Request('http://test.com')
-    res = Response(req, 200, b'<p>Hello world<\p>', {})
+    res = Response(req, 200, b'<p>Hello world<\p>', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
 
     def open_browser_function(url):
         return True

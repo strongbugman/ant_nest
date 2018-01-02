@@ -1,6 +1,9 @@
 import os
+import time
+from multidict import CIMultiDictProxy, CIMultiDict
 
 import pytest
+from aiohttp.backport_cookies import SimpleCookie
 
 from ant_nest import *
 
@@ -16,13 +19,17 @@ def test_report_pipeline():
     thing = Item()
     for _ in range(10):
         assert pl.process(thing) is thing
-    assert pl.count == 10
+    now_time = time.time()
+    pl.last_time = now_time - 61
+    assert pl.process(thing) is thing
+    pl.on_spider_close()
+    assert pl.count == 11
 
 
 def test_response_fileter_error_pipeline():
     pl = ResponseFilterErrorPipeline()
-    res = Response(Request('http://test.com'), 200, b'')
-    err_res = Response(Request('http://test.com'), 403, b'')
+    res = Response(Request('http://test.com'), 200, b'', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
+    err_res = Response(Request('http://test.com'), 403, b'', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
     assert res is pl.process(res)
     assert pl.process(err_res) is None
 

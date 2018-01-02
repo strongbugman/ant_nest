@@ -1,4 +1,4 @@
-from typing import Any, Optional, List, Coroutine, Union, Dict, Callable
+from typing import Optional, List, Coroutine, Union, Dict, Callable, AnyStr, IO
 import abc
 import itertools
 import logging
@@ -17,15 +17,16 @@ from tenacity.stop import stop_after_attempt
 from .pipelines import Pipeline
 from .things import Request, Response, Item, Things
 from .exceptions import ThingDropped
+from . import queen
 
 
 __all__ = ['Ant']
 
 
 class Ant(abc.ABC):
-    response_pipelines = [Pipeline()]  # type: List[Pipeline]
-    request_pipelines = [Pipeline()]  # type: List[Pipeline]
-    item_pipelines = [Pipeline()]  # type: List[Pipeline]
+    response_pipelines = []  # type: List[Pipeline]
+    request_pipelines = []  # type: List[Pipeline]
+    item_pipelines = []  # type: List[Pipeline]
     request_timeout = DEFAULT_TIMEOUT
     request_retries = 3
     request_retry_delay = 5
@@ -38,16 +39,18 @@ class Ant(abc.ABC):
         self.sessions = {}  # type: Dict[str, ClientSession]
 
     async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None,
-                      headers: Optional[dict]=None, cookies: Optional[dict]=None, data: Optional[Any]=None,
+                      headers: Optional[dict]=None, cookies: Optional[dict]=None,
+                      data: Optional[Union[AnyStr, Dict, IO]]=None,
                       ) -> Response:
         req = Request(url, method=method, params=params, headers=headers, cookies=cookies, data=data)
         req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=self.request_timeout)
 
+        request_function = queen.timeout_wrapper(self._request, timeout=self.request_timeout)
         retries = self.request_retries
         if retries > 0:
-            res = await self.make_retry_decorator(retries, self.request_retry_delay)(self._request)(req)
+            res = await self.make_retry_decorator(retries, self.request_retry_delay)(request_function)(req)
         else:
-            res = await self._request(req)
+            res = await request_function(req)
 
         res = await self._handle_thing_with_pipelines(res, self.response_pipelines, timeout=self.request_timeout)
         return res
@@ -80,6 +83,10 @@ class Ant(abc.ABC):
         try:
             await self.open()
             await self.run()
+            # wait scheduled coroutines before wait "close" method
+            await queen.wait_scheduled_coroutines()
+            await self.close()
+            await queen.wait_scheduled_coroutines()
         except Exception as e:
             self.logger.exception('Run main coroutine with ' + e.__class__.__name__)
 
@@ -101,7 +108,7 @@ class Ant(abc.ABC):
                 with async_timeout.timeout(timeout):
                     thing = await thing
             if thing is None:
-                msg = 'The thing {:s} is dropped by {:s}'.format(str(raw_thing),
+                msg = '"{:s}" is dropped by {:s}'.format(str(raw_thing),
                                                                  pipeline.__class__.__name__)
                 self.logger.warning(msg)
                 raise ThingDropped(msg)
@@ -114,7 +121,7 @@ class Ant(abc.ABC):
         kwargs['max_redirects'] = self.request_max_redirects
         kwargs['allow_redirects'] = self.request_allow_redirects
 
-        # proxy auth not work in one session in many requests with proxy auth case
+        # proxy auth not work when one session with many requests
         if self.request_proxy is not None and URL(self.request_proxy).user is not None:
             async with aiohttp.ClientSession(cookies=cookies) as session:
                 async with session.request(**kwargs) as aio_response:

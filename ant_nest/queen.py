@@ -53,12 +53,21 @@ def reset_concurrent_limit(limit: typing.Optional[int]) -> None:
         __concurrent_limit = limit
 
 
-async def timeout_wrapper(coroutine: typing.Coroutine, timeout: float=__timeout):
-    if timeout > 0:
+def timeout_wrapper(coro_or_func: typing.Union[typing.Coroutine, typing.Callable], timeout: float=__timeout
+                    ) -> typing.Union[typing.Coroutine, typing.Callable]:
+    """Add timeout limit to coroutine or coroutine function"""
+
+    async def wrapper(*args, **kwargs):
         with async_timeout.timeout(timeout):
-            return await coroutine
+            if asyncio.iscoroutinefunction(coro_or_func):
+                return await coro_or_func(*args, **kwargs)
+            else:
+                return await coro_or_func
+
+    if asyncio.iscoroutinefunction(coro_or_func):
+        return wrapper
     else:
-        return await coroutine
+        return wrapper()
 
 
 def schedule_coroutine(coroutine: typing.Coroutine, timeout: float=__timeout) -> None:
@@ -103,6 +112,8 @@ def schedule_coroutines(coroutines: typing.Iterable, timeout: float=__timeout) -
 
 async def wait_scheduled_coroutines():
     """Wait all coroutines schedule by "schedule_coroutine" function"""
+    if __loop is None:
+        return
     while __running_count > 0 or __done_queue.qsize() > 0:
         await __done_queue.get()
 
