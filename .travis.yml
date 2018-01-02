@@ -11,7 +11,7 @@ before_install:
 - mysql -e 'DROP DATABASE IF EXISTS test;'
 - mysql -e 'CREATE DATABASE test;'
 - docker pull kennethreitz/httpbin
-- docker run -d -p 8080:8080 httpbin
+- docker run -d -p 8080:8080 kennethreitz/httpbin
 install:
 - python setup.py install
 - pip install codecov
