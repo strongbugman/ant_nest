@@ -62,15 +62,22 @@ class Ant(abc.ABC):
     async def open(self) -> None:
         self.logger.info('Opening')
         for pipeline in itertools.chain(self.item_pipelines, self.response_pipelines, self.request_pipelines):
-            obj = pipeline.on_spider_open()
-            if isinstance(obj, Coroutine):
-                await obj
+            try:
+                obj = pipeline.on_spider_open()
+                if isinstance(obj, Coroutine):
+                    await obj
+            except Exception as e:
+                self.logger.exception('Open pipelines with ' + e.__class__.__name__)
 
     async def close(self) -> None:
         for pipeline in itertools.chain(self.item_pipelines, self.response_pipelines, self.request_pipelines):
-            obj = pipeline.on_spider_close()
-            if isinstance(obj, Coroutine):
-                await obj
+            try:
+                obj = pipeline.on_spider_close()
+                if isinstance(obj, Coroutine):
+                    await obj
+            except Exception as e:
+                self.logger.exception('Close pipelines with ' + e.__class__.__name__)
+        # close cached sessions
         for session in self.sessions.values():
             await session.close()
         self.logger.info('Closed')
@@ -80,15 +87,15 @@ class Ant(abc.ABC):
         """App custom entrance"""
 
     async def main(self) -> None:
+        await self.open()
         try:
-            await self.open()
             await self.run()
-            # wait scheduled coroutines before wait "close" method
-            await queen.wait_scheduled_coroutines()
-            await self.close()
-            await queen.wait_scheduled_coroutines()
         except Exception as e:
-            self.logger.exception('Run main coroutine with ' + e.__class__.__name__)
+            self.logger.exception('Run ant run`s coroutine with ' + e.__class__.__name__)
+        # wait scheduled coroutines before wait "close" method
+        await queen.wait_scheduled_coroutines()
+        await self.close()
+        await queen.wait_scheduled_coroutines()
 
     @staticmethod
     def make_retry_decorator(retries: int, delay: float) -> Callable[[Callable], Callable]:
@@ -98,7 +105,7 @@ class Ant(abc.ABC):
 
     async def _handle_thing_with_pipelines(self, thing: Things, pipelines: List[Pipeline],
                                            timeout=DEFAULT_TIMEOUT) -> Things:
-        """Process thing one by one, break the process chain when get None
+        """Process thing one by one, break the process chain when get "None" or exception
         :raise ThingDropped"""
         self.logger.debug('Process thing: ' + str(thing))
         raw_thing = thing
@@ -108,10 +115,7 @@ class Ant(abc.ABC):
                 with async_timeout.timeout(timeout):
                     thing = await thing
             if thing is None:
-                msg = '"{:s}" is dropped by {:s}'.format(str(raw_thing),
-                                                                 pipeline.__class__.__name__)
-                self.logger.warning(msg)
-                raise ThingDropped(msg)
+                raise ThingDropped('"{:s}" is dropped by {:s}'.format(str(raw_thing), pipeline.__class__.__name__))
         return thing
 
     async def _request(self, req: Request) -> Response:

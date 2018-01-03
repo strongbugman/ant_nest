@@ -60,7 +60,6 @@ class ReportPipeline(Pipeline):
 class ResponseFilterErrorPipeline(Pipeline):
     def process(self, thing: Response) -> Optional[Response]:
         if thing.status >= 400:
-            self.logger.warning('Response: {:s} has bean dropped'.format(str(thing)))
             return None
         else:
             return thing
