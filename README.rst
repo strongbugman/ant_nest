@@ -114,11 +114,17 @@ Defect
 one coroutine`s exception will break await chain especially in a loop unless we handle it by
 hand. eg::
 
-    for cor in self.as_completed((self.crawl(url) for url in self.urls)):
+    for cor in queen.as_completed((self.crawl(url) for url in self.urls)):
         try:
             await cor
         except Exception:  # may raise many exception in a await chain
             pass
+
+but now use can use "queen.as_completed_with_async", eg::
+
+    async fo result in queen.as_completed_with_async(self.crawl(url) for ufl in self.urls):
+        # exception in "self.crawl(url)" will be pass automatic
+        self.handle(result)
 
 * High memory usage
 

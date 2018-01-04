@@ -245,7 +245,7 @@ class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
 
 class ItemBaseEmailPipeline(Pipeline):
     def __init__(self, account: str, password: str, server: str, port: int, recipients: List[str],
-                 sender_name: str='AntNest.ItemEmailPipeline', starttls=False):
+                 sender_name: str='AntNest.ItemEmailPipeline', tls: bool=False, starttls: bool=False):
         super().__init__()
         self.account = account
         self.password = password
@@ -254,6 +254,7 @@ class ItemBaseEmailPipeline(Pipeline):
         self.recipients = recipients
         self.sender_name = sender_name
         self.starttls = starttls
+        self.tls = tls
 
     async def open_smtp(self) -> aiosmtplib.SMTP:
         smtp = aiosmtplib.SMTP()
@@ -261,7 +262,7 @@ class ItemBaseEmailPipeline(Pipeline):
             await smtp.connect(self.server, self.port, use_tls=False)
             await smtp.starttls()
         else:
-            await smtp.connect(self.server, self.port)
+            await smtp.connect(self.server, self.port, use_tls=self.tls)
         await smtp.login(self.account, self.password)
         return smtp
 
