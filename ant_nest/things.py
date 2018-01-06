@@ -213,58 +213,72 @@ class Item(MutableMapping, metaclass=ItemMeta):
 Things = Union[Request, Response, Item]
 
 
+class CustomNoneType:
+    pass
+
+
 class ItemExtractor:
-    take_first = 'take_first'
-    join_all = 'join_all'
-    do_nothing = 'do_nothing'
+    extract_with_take_first = 'take_first'
+    extract_with_join_all = 'join_all'
+    extract_with_do_nothing = 'do_nothing'
 
     def __init__(self, item_class: Type[Item]):
         self.item_class = item_class
         self.logger = logging.getLogger(self.__class__.__name__)
         self.path = defaultdict(list)  # type: DefaultDict[str, List[Tuple[str, str, str]]]
 
-    def add_xpath(self, key: str, xpath: str, extract_type=take_first):
+    def add_xpath(self, key: str, xpath: str, extract_type=extract_with_take_first):
         self.path[key].append(('xpath', xpath, extract_type))
 
-    def add_regex(self, key: str, pattern: str, extract_type=take_first):
+    def add_regex(self, key: str, pattern: str, extract_type=extract_with_take_first):
         self.path[key].append(('regex', pattern, extract_type))
 
-    def add_jpath(self, key: str, jpath, extract_type=take_first):
+    def add_jpath(self, key: str, jpath, extract_type=extract_with_take_first):
         self.path[key].append(('jpath', jpath, extract_type))
+
+    @staticmethod
+    def extract_value(_type: str, pattern: str, data: Any, extract_type=extract_with_take_first) -> Any:
+        if _type == 'xpath':
+            extract_value = data.xpath(pattern)
+        elif _type == 'regex':
+            extract_value = re.findall(pattern, data)
+        elif _type == 'jpath':
+            extract_value = jpath.get_all(pattern, data)
+        else:
+            raise ValueError('The type: {:s} not support'.format(_type))
+        # handle by extract type
+        if extract_type == ItemExtractor.extract_with_take_first:
+            extract_value = extract_value[0]
+        elif extract_type == ItemExtractor.extract_with_join_all:
+            extract_value = list(filter(lambda x: isinstance(x, str), extract_value))  # join string only
+            extract_value = ''.join(extract_value)
+        return extract_value
 
     def extract(self, response: Response) -> Item:
         """Extract item from response by path with xpath, jpath or re."""
         self.logger.debug('Extract item: {:s} with path: {:s}'.format(self.item_class.__name__, str(self.path)))
         item = self.item_class()
         for key, all_xpath in self.path.items():
-            value = None
+            value = CustomNoneType()  # be different with "None" obj ("null" in json)
             for path_type, path, extract_type in all_xpath:
+                # get data by search type
                 if path_type == 'xpath':
-                    extract_value = response.html_element.xpath(path)
+                    data = response.html_element
                 elif path_type == 'regex':
-                    extract_value = re.findall(path, response.text)
-                elif path_type == 'jpath':
-                    extract_value = jpath.get_all(path, response.json)
+                    data = response.text
                 else:
+                    data = response.json
+                try:
+                    extract_value = ItemExtractor.extract_value(path_type, path, data, extract_type=extract_type)
+                except IndexError:
                     continue
-                if len(extract_value) == 0:
-                    continue
-                # handle by extract type
-                if extract_type == self.take_first:
-                    extract_value = extract_value[0]
-                elif extract_type == self.join_all:
-                    extract_value = list(filter(lambda x: isinstance(x, str), extract_value))  # join string only
-                    extract_value = ''.join(extract_value)
-                elif extract_value == self.do_nothing:
-                    pass
                 # check multiple path`s result
-                if extract_value is not None:
-                    if value is not None and value != extract_value:
-                        raise ItemExtractError(
-                            'Match different result: {:s} and {:s} for key: {:s}'.format(value, extract_value, key))
-                    elif extract_value is not None:
-                        value = extract_value
-            item[key] = value
+                if not isinstance(value, CustomNoneType) and value != extract_value:
+                    raise ItemExtractError(
+                        'Match different result: {:s} and {:s} for key: {:s}'.format(value, extract_value, key))
+                value = extract_value
+            if not isinstance(value, CustomNoneType):
+                item[key] = value
         return item
 
 

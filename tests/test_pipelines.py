@@ -157,7 +157,18 @@ async def test_item_mysql_pipeline():
     data = await ubpl.pull_data('SELECT * FROM test')
     assert test_item.test == data[0]['test']
 
+    iubpl = ItemMysqlInsertUpdatePipeline(
+        ['test'],
+        host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
+        database=mysql_database, table='test')
+    await iubpl.on_spider_open()
+    test_item.test = 'I love ant!'
+    assert test_item is await iubpl.process(test_item)
+    data = await iubpl.pull_data('SELECT * FROM test')
+    assert test_item.test == data[0]['test']
+
     await ubpl.on_spider_close()
     await ibpl.on_spider_close()
+    await iubpl.on_spider_close()
     await bpl.push_data('DROP TABLE test;')
     await bpl.on_spider_close()

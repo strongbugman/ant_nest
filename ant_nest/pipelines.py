@@ -97,7 +97,7 @@ class RequestUserAgentPipeline(Pipeline):
 # Item pipelines
 class ItemPrintPipeline(Pipeline):
     def process(self, thing: Item) -> Item:
-        self.logger.info(str(thing))
+        self.logger.info(thing.__repr__())
         return thing
 
 
@@ -240,6 +240,29 @@ class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
             sql = self.sql_format.format(database=self.database, table=self.table, pairs=','.join(pairs),
                                          primary_key=self.primary_key, primary_value=primary_value)
             await self.push_data(sql)
+        return thing
+
+
+class ItemMysqlInsertUpdatePipeline(ItemBaseMysqlPipeline):
+    sql_format = 'INSERT INTO {database}.{table} ({fields}) VALUES ({values}) on duplicate key update {pairs}'
+
+    def __init__(self, update_keys: List[str], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.update_keys = update_keys
+
+    async def process(self, thing: Item) -> Item:
+        fields = []
+        values = []
+        pairs = []
+        for k, v in thing.items():
+            v = self.convert_item_value(v)
+            fields.append(k)
+            values.append(v)
+            if k in self.update_keys:
+                pairs.append('{:s}={:s}'.format(k, v))
+        sql = self.sql_format.format(database=self.database, table=self.table, fields=','.join(fields),
+                                     values=','.join(values), pairs=','.join(pairs))
+        await self.push_data(sql)
         return thing
 
 
