@@ -120,7 +120,7 @@ hand. eg::
         except Exception:  # may raise many exception in a await chain
             pass
 
-but now use can use "queen.as_completed_with_async", eg::
+but we can use "queen.as_completed_with_async", eg::
 
     async fo result in queen.as_completed_with_async(self.crawl(url) for ufl in self.urls):
         # exception in "self.crawl(url)" will be pass automatic
