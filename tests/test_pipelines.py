@@ -14,18 +14,6 @@ async def test_pipeline():
     await pl.process(Request(url='test.com'))
 
 
-def test_report_pipeline():
-    pl = ReportPipeline()
-    thing = Item()
-    for _ in range(10):
-        assert pl.process(thing) is thing
-    now_time = time.time()
-    pl.last_time = now_time - 61
-    assert pl.process(thing) is thing
-    pl.on_spider_close()
-    assert pl.count == 11
-
-
 def test_response_fileter_error_pipeline():
     pl = ResponseFilterErrorPipeline()
     res = Response(Request('http://test.com'), 200, b'', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
@@ -38,7 +26,7 @@ def test_request_duplicate_filter_pipeline():
     pl = RequestDuplicateFilterPipeline()
     req = Request('http://test.com')
     assert pl.process(req) is req
-    assert pl.process(req) is None
+    assert isinstance(pl.process(req), ThingDropped)
 
 
 class TItem(Item):
@@ -58,7 +46,7 @@ def test_item_validate_pipeline():
     pl = ItemValidatePipeline()
     item = TItem()
     item.count = '3'
-    assert pl.process(item) is None
+    assert isinstance(pl.process(item), FieldValidationError)
 
     item.info = 'hi'
     pl.process(item)

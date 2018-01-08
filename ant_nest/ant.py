@@ -1,7 +1,9 @@
-from typing import Optional, List, Coroutine, Union, Dict, Callable, AnyStr, IO
+from typing import Optional, List, Coroutine, Union, Dict, Callable, AnyStr, IO, DefaultDict
 import abc
 import itertools
 import logging
+import time
+from collections import defaultdict
 
 import aiohttp
 from aiohttp.client_reqrep import ClientResponse
@@ -16,7 +18,6 @@ from tenacity.stop import stop_after_attempt
 
 from .pipelines import Pipeline
 from .things import Request, Response, Item, Things
-from .exceptions import ThingDropped
 from . import queen
 
 
@@ -37,6 +38,12 @@ class Ant(abc.ABC):
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.sessions = {}  # type: Dict[str, ClientSession]
+        # report var
+        self._reports = defaultdict(lambda: [0, 0])  # type: DefaultDict[str, List[int, int]]
+        self._drop_reports = defaultdict(lambda: [0, 0])  # type: DefaultDict[str, List[int, int]]
+        self._start_time = time.time()
+        self._last_time = self._start_time
+        self._report_slot = 60  # report once after one minute by default
 
     async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None,
                       headers: Optional[dict]=None, cookies: Optional[dict]=None,
@@ -44,6 +51,7 @@ class Ant(abc.ABC):
                       ) -> Response:
         req = Request(url, method=method, params=params, headers=headers, cookies=cookies, data=data)
         req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=self.request_timeout)
+        self.report(req)
 
         request_function = queen.timeout_wrapper(self._request, timeout=self.request_timeout)
         retries = self.request_retries
@@ -53,11 +61,13 @@ class Ant(abc.ABC):
             res = await request_function(req)
 
         res = await self._handle_thing_with_pipelines(res, self.response_pipelines, timeout=self.request_timeout)
+        self.report(res)
         return res
 
     async def collect(self, item: Item) -> None:
         self.logger.debug('Collect item: ' + str(item))
         await self._handle_thing_with_pipelines(item, self.item_pipelines)
+        self.report(item)
 
     async def open(self) -> None:
         self.logger.info('Opening')
@@ -96,6 +106,12 @@ class Ant(abc.ABC):
         await queen.wait_scheduled_coroutines()
         await self.close()
         await queen.wait_scheduled_coroutines()
+        # total report
+        for name, counts in self._reports.items():
+            self.logger.info('Get {:d} {:s} in total'.format(counts[1], name))
+        for name, counts in self._drop_reports.items():
+            self.logger.info('Drop {:d} {:s} in total'.format(counts[1], name))
+        self.logger.info('Run {:s} in {:f} seconds'.format(self.__class__.__name__, time.time() - self._start_time))
 
     @staticmethod
     def make_retry_decorator(retries: int, delay: float) -> Callable[[Callable], Callable]:
@@ -114,8 +130,9 @@ class Ant(abc.ABC):
             if isinstance(thing, Coroutine):
                 with async_timeout.timeout(timeout):
                     thing = await thing
-            if thing is None:
-                raise ThingDropped('"{:s}" is dropped by {:s}'.format(str(raw_thing), pipeline.__class__.__name__))
+            if isinstance(thing, Exception):
+                self.report(raw_thing, dropped=True)
+                raise thing
         return thing
 
     async def _request(self, req: Request) -> Response:
@@ -150,3 +167,22 @@ class Ant(abc.ABC):
         return Response(request, aio_response.status, aio_response._content,
                         headers=aio_response.headers, cookies=aio_response.cookies,
                         encoding=aio_response._get_encoding())
+
+    def report(self, thing: Things, dropped: bool=False) -> None:
+        report_type = thing.__class__.__name__
+        if dropped:
+            reports = self._drop_reports
+            log_prefix = 'Dropped'
+        else:
+            reports = self._reports
+            log_prefix = 'Got'
+        counts = reports[report_type]
+        counts[1] += 1
+        now_time = time.time()
+        if now_time - self._last_time > self._report_slot:
+            count = counts[1] - counts[0]
+            self.logger.info(
+                '{:s} {:d} {:s} in total with {:d}/{:d} rate'.format(
+                    log_prefix, counts[1], report_type, count, self._report_slot))
+            self._last_time = now_time
+            counts[0] = counts[1]

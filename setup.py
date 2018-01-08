@@ -11,7 +11,7 @@ requires = ['aiohttp==2.3.6', 'async-timeout==2.0.0', 'chardet==3.0.4', 'lxml==4
 
 setup(
     name="ant_nest",
-    version="0.24.0",
+    version="0.25.0",
     url='https://github.com/6ugman/ant_nest',
     description='A simple and clear Web Crawler framework build on python3.6+ with async',
     long_description=open('README.rst').read(),

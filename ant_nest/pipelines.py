@@ -1,9 +1,8 @@
-from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO
+from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union
 import logging
 from collections import defaultdict
 import json
 import os
-import time
 import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -13,7 +12,7 @@ import aiomysql
 import aiosmtplib
 
 from .things import Things, Response, Request, Item
-from .exceptions import FieldValidationError
+from .exceptions import FieldValidationError, ThingDropped
 
 
 class Pipeline:
@@ -26,41 +25,16 @@ class Pipeline:
     async def on_spider_close(self) -> None:
         """Call when ant close, method or coroutine"""
 
-    async def process(self, thing: Things) -> Optional[Things]:
+    async def process(self, thing: Things) -> Union[Things, Exception]:
         """method or coroutine"""
         return thing
 
 
-class ReportPipeline(Pipeline):
-    def __init__(self):
-        self.count = 0
-        self.report_type = None
-        self.last_time = time.time()
-        self.last_count = 0
-        super().__init__()
-
-    def process(self, thing: Things) -> Things:
-        if self.report_type is None:
-            self.report_type = thing.__class__.__name__
-        self.count += 1
-        now_time = time.time()
-        if now_time - self.last_time > 60:
-            count = self.count - self.last_count
-            self.logger.info('Get {:d} {:s} in total with {:d}/min rate'.format(self.count, self.report_type, count))
-            self.last_time = now_time
-            self.last_count = self.count
-        return thing
-
-    def on_spider_close(self):
-        if self.report_type is not None:
-            self.logger.info('Get {:d} {:s} in total'.format(self.count, self.report_type))
-
-
 # Response pipelines
 class ResponseFilterErrorPipeline(Pipeline):
-    def process(self, thing: Response) -> Optional[Response]:
+    def process(self, thing: Response) -> Union[Things, Exception]:
         if thing.status >= 400:
-            return None
+            return
         else:
             return thing
 
@@ -71,9 +45,9 @@ class RequestDuplicateFilterPipeline(Pipeline):
         self.__request_urls = set()
         super().__init__()
 
-    def process(self, thing: Request) -> Optional[Request]:
+    def process(self, thing: Request) -> Union[Things, Exception]:
         if thing.url in self.__request_urls:
-            return None
+            return ThingDropped('Request duplicate!')
         else:
             self.__request_urls.add(thing.url)
             return thing
@@ -102,12 +76,12 @@ class ItemPrintPipeline(Pipeline):
 
 
 class ItemValidatePipeline(Pipeline):
-    def process(self, thing: Item) -> Optional[Item]:
+    def process(self, thing: Item) -> Union[Things, Exception]:
         try:
             thing.validate()
             return thing
-        except FieldValidationError:
-            return None
+        except FieldValidationError as e:
+            return e
 
 
 class ItemFieldReplacePipeline(Pipeline):

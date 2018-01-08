@@ -120,7 +120,20 @@ async def test_with_timeout():
 
 @pytest.mark.asyncio
 async def test_pipelines():
+
+    class TestPipeline(Pipeline):
+        async def process(self, thing):
+            return TypeError('Test error')
+
+        def on_spider_open(self):
+            raise TypeError('Test error')
+
+        def on_spider_close(self):
+            raise TypeError('Test error')
+
     class TestAnt(Ant):
+        item_pipelines = [TestPipeline()]
+
         async def run(self):
             return None
 
@@ -128,14 +141,13 @@ async def test_pipelines():
     thing = Request('test_url')
     ant = TestAnt()
     assert thing is await ant._handle_thing_with_pipelines(thing, pls)
-
-    class TestPipeline(Pipeline):
-        async def process(self, thing):
-            return None
-
+    # with exception
     pls[5] = TestPipeline()
-    with pytest.raises(ThingDropped):
+    with pytest.raises(TypeError):
         await ant._handle_thing_with_pipelines(thing, pls)
+    # exception will be ignored in "open" and "close" method
+    await ant.open()
+    await ant.close()
 
 
 @pytest.mark.asyncio
@@ -193,12 +205,15 @@ async def test_with_real_request():
     assert res.status == 302
     assert res.cookies['k1'].value == 'v1'
     assert res.cookies['k2'].value == 'v2'
-    # redirects
+    # redirects and report
+    ant._last_time -= ant._last_time + 1
     ant.request_allow_redirects = True
     ant.request_max_redirects = 3
     res = await ant.request(httpbin_base_url + 'redirect/2')
     assert res.status == 200
     res = await ant.request(httpbin_base_url + 'redirect/3')
     assert res.status == 302
-
-    await ant.close()
+    assert ant._reports['Request'][1] > 12
+    # dropped item report
+    ant.report(Item(), dropped=True)
+    await ant.main()
