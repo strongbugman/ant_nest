@@ -142,12 +142,12 @@ class Ant(abc.ABC):
         kwargs['max_redirects'] = self.request_max_redirects
         kwargs['allow_redirects'] = self.request_allow_redirects
 
-        # proxy auth not work when one session with many requests
-        if self.request_proxy is not None and URL(self.request_proxy).user is not None:
-            async with aiohttp.ClientSession(cookies=cookies) as session:
-                async with session.request(**kwargs) as aio_response:
-                    await aio_response.read()
-                return self._convert_response(aio_response, req)
+        # proxy auth not work when one session with many requests, add auth header to fix it
+        proxy = None if kwargs['proxy'] is None else URL(kwargs['proxy'])
+        if proxy is not None and proxy.user is not None:
+            if kwargs['headers'] is None:
+                kwargs['headers'] = dict()
+            kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = aiohttp.BasicAuth.from_url(proxy).encode()
 
         host = req.url.host
         if host not in self.sessions:
