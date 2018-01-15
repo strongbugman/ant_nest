@@ -169,20 +169,25 @@ class Ant(abc.ABC):
                         encoding=aio_response._get_encoding())
 
     def report(self, thing: Things, dropped: bool=False) -> None:
+        now_time = time.time()
+        if now_time - self._last_time > self._report_slot:
+            self._last_time = now_time
+            for name, counts in self._reports.items():
+                count = counts[1] - counts[0]
+                counts[0] = counts[1]
+                self.logger.info(
+                    'Get {:d} {:s} in total with {:d}/{:d}s rate'.format(
+                        counts[1], name, count, self._report_slot))
+            for name, counts in self._drop_reports.items():
+                count = counts[1] - counts[0]
+                counts[0] = counts[1]
+                self.logger.info(
+                    'Drop {:d} {:s} in total with {:d}/{:d} rate'.format(
+                        counts[1], name, count, self._report_slot))
         report_type = thing.__class__.__name__
         if dropped:
             reports = self._drop_reports
-            log_prefix = 'Dropped'
         else:
             reports = self._reports
-            log_prefix = 'Got'
         counts = reports[report_type]
         counts[1] += 1
-        now_time = time.time()
-        if now_time - self._last_time > self._report_slot:
-            count = counts[1] - counts[0]
-            self.logger.info(
-                '{:s} {:d} {:s} in total with {:d}/{:d} rate'.format(
-                    log_prefix, counts[1], report_type, count, self._report_slot))
-            self._last_time = now_time
-            counts[0] = counts[1]
