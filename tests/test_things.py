@@ -1,24 +1,24 @@
 import os
-from multidict import CIMultiDictProxy, CIMultiDict
 
-from aiohttp.backport_cookies import SimpleCookie
+from yarl import URL
 import pytest
 
 from ant_nest import *
 
 
 def test_request():
-    req = Request('http://test.com')
+    req = Request('GET', URL('http://test.com'))
     assert req.method == 'GET'
     req.__repr__()
 
 
 def test_response():
-    req = Request('http://test.com')
-    res = Response(req, 200, b'1', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
-    assert res.text == '1'
-    assert res.json == 1
-    res.__repr__()
+    req = Request('GET', URL('http://test.com'))
+    res = Response('GET', req.url)
+    res._content = b'1'
+    assert res.get_text(encoding='utf-8') == '1'
+    assert res.simple_text == '1'
+    assert res.simple_json == 1
 
 
 def test_field():
@@ -106,9 +106,11 @@ def test_extract():
         paragraph = StringField()
         title = StringField()
 
-    request = Request(url='https://www.python.org/')
+    request = Request('GET', URL('https://www.python.org/'))
     with open('./tests/test.html', 'rb') as f:
-        response = Response(request, 200, f.read(), CIMultiDictProxy(CIMultiDict()), SimpleCookie())
+        response = Response('GET', request.url)
+        response._content = f.read()
+        response.get_text(encoding='utf-8')
     # extract item with xpath and regex
     item_extractor = ItemExtractor(TestItem)
     item_extractor.add_xpath('paragraph', '/html/body/div/p/text()')
@@ -129,7 +131,9 @@ def test_extract():
     class TestItem(Item):
         author = StringField()
 
-    response = Response(request, 200, b'{"a": {"b": {"c": 1}}, "d": null}', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
+    response = Response('GET', request.url)
+    response._content = b'{"a": {"b": {"c": 1}}, "d": null}'
+    response.get_text(encoding='utf-8')
     item_extractor = ItemExtractor(TestItem)
     item_extractor.add_jpath('author', 'a.b.c')
     item_extractor.add_jpath('freedom', 'd')
@@ -141,7 +145,9 @@ def test_extract():
         ItemExtractor.extract_value('something else', 'test', 'test')
     # extract with wrappers
     with open('./tests/test.html', 'rb') as f:
-        response = Response(request, 200, f.read(), CIMultiDictProxy(CIMultiDict()), SimpleCookie())
+        response = Response('GET', request.url)
+        response._content = f.read()
+        response.get_text(encoding='utf-8')
     assert extract_value_by_xpath('/html/body/div/p/text()', response.html_element) == 'test'
     assert extract_value_by_jpath('a', {'a': 1}) == 1
     assert extract_value_by_regex('(\d+)', 'I have 2 apples') == '2'
@@ -162,8 +168,9 @@ def test_cli_get_ants():
 
 
 def test_cli_open_browser():
-    req = Request('http://test.com')
-    res = Response(req, 200, b'<p>Hello world<\p>', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
+    req = Request('GET', URL('http://test.com'))
+    res = Response('GET', req.url)
+    res._content = b''
 
     def open_browser_function(url):
         return True
