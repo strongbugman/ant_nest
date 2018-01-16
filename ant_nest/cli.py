@@ -54,7 +54,7 @@ async def run_ant(ant_cls: Type[Ant]):
 def open_response_in_browser(response: Response, file_type: str='.html',
                              _open_browser_function: Callable[..., bool]=webbrowser.open) -> bool:
     fd, path = tempfile.mkstemp(file_type)
-    os.write(fd, response.content)
+    os.write(fd, response._content)
     os.close(fd)
     return _open_browser_function('file://' + path)
 

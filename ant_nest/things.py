@@ -1,76 +1,65 @@
 """The thing`s usage is simple, can be created by ant, processed by ants and pipelines"""
-from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, DefaultDict, AnyStr, IO
+from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, DefaultDict, AnyStr, IO, Callable
 from collections.abc import MutableMapping
 import json
 import abc
 from collections import defaultdict
 import logging
 import re
-from multidict import CIMultiDictProxy
 
+from aiohttp import ClientRequest, ClientResponse
 from lxml import html
-from yarl import URL
 import jpath
-from aiohttp.backport_cookies import SimpleCookie
 
 from .exceptions import FieldValidationError, ItemExtractError
 
 
-class Request:
-    __slots__ = ('url', 'params', 'method', 'headers', 'cookies', 'data')
-
-    def __init__(self, url: Union[str, URL], method='GET', params: Optional[dict]=None, headers: Optional[dict]=None,
-                 cookies: Optional[dict]=None, data: Optional[Union[AnyStr, Dict, IO]]=None):
-        if isinstance(url, str):
-            url = URL(url)
-        self.url = url
-        self.params = params
-        self.method = method
-        self.headers = headers
-        self.cookies = cookies
-        self.data = data
-
-    def __repr__(self):
-        return '{:s}: {:s} {:s}'.format(self.__class__.__name__, self.method, str(self.url))
+class Request(ClientRequest):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # store data obj
+        self.data = kwargs.get('data', None)  # type: Union[AnyStr, dict, IO, None]
 
 
-class Response:
-    __slots__ = ('url', 'status', 'headers', 'cookies', 'encoding', 'content', '_text', 'request', '_html_element',
-                 '_json')
-
-    def __init__(self, request: Request, status: int, content: bytes, headers: CIMultiDictProxy,
-                 cookies: SimpleCookie, encoding: str='utf-8'):
-        self.request = request
-        self.url = request.url
-        self.status = status
-        self.headers = headers
-        self.cookies = cookies
-        self.encoding = encoding
-        self.content = content
+class Response(ClientResponse):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._text = None
         self._html_element = None
         self._json = None
 
-    @property
-    def text(self) -> str:
+    def get_text(self, encoding: Optional[str]=None, errors: str='strict') -> str:
+        if self._content is None:
+            raise ValueError('Read stream first')
         if self._text is None:
-            self._text = self.content.decode(self.encoding)
+            if encoding is None:
+                encoding = self._get_encoding()
+            self._text = self._content.decode(encoding, errors=errors)
         return self._text
 
     @property
-    def json(self) -> Any:
+    def simple_text(self) -> str:
+        return self.get_text()
+
+    def get_json(self, encoding: Optional[str] = None, decode_errors: str='strict',
+                 loads: Callable=json.loads):
+        if self._text is None:
+            text = self.get_text(encoding=encoding, errors=decode_errors)
+        else:
+            text = self._text
         if self._json is None:
-            self._json = json.loads(self.text)
+            self._json = loads(text)
         return self._json
+
+    @property
+    def simple_json(self) -> Any:
+        return self.get_json()
 
     @property
     def html_element(self) -> html.HtmlElement:
         if self._html_element is None:
-            self._html_element = html.fromstring(self.text)
+            self._html_element = html.fromstring(self.simple_text)
         return self._html_element
-
-    def __repr__(self):
-        return '{:s}: {:s} {:d}'.format(self.__class__.__name__, str(self.url), self.status)
 
 
 class IntField:
@@ -265,9 +254,9 @@ class ItemExtractor:
                 if path_type == 'xpath':
                     data = response.html_element
                 elif path_type == 'regex':
-                    data = response.text
+                    data = response.simple_text
                 else:
-                    data = response.json
+                    data = response.simple_json
                 try:
                     extract_value = ItemExtractor.extract_value(path_type, path, data, extract_type=extract_type)
                 except IndexError:

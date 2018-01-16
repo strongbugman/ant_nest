@@ -6,7 +6,6 @@ import time
 from collections import defaultdict
 
 import aiohttp
-from aiohttp.client_reqrep import ClientResponse
 from aiohttp.client import DEFAULT_TIMEOUT
 from aiohttp import ClientSession
 import async_timeout
@@ -34,6 +33,7 @@ class Ant(abc.ABC):
     request_proxy = None  # type: Optional[str]
     request_max_redirects = 10
     request_allow_redirects = True
+    response_in_stream = False
 
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -49,7 +49,9 @@ class Ant(abc.ABC):
                       headers: Optional[dict]=None, cookies: Optional[dict]=None,
                       data: Optional[Union[AnyStr, Dict, IO]]=None,
                       ) -> Response:
-        req = Request(url, method=method, params=params, headers=headers, cookies=cookies, data=data)
+        if not isinstance(url, URL):
+            url = URL(url)
+        req = Request(method, url, params=params, headers=headers, cookies=cookies, data=data)
         req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=self.request_timeout)
         self.report(req)
 
@@ -136,8 +138,8 @@ class Ant(abc.ABC):
         return thing
 
     async def _request(self, req: Request) -> Response:
-        kwargs = {k: getattr(req, k) for k in req.__slots__}
-        cookies = kwargs.pop('cookies')
+        # cookies in headers, params in url
+        kwargs = dict(method=req.method, url=req.url, headers=req.headers, data=req.data)
         kwargs['proxy'] = self.request_proxy
         kwargs['max_redirects'] = self.request_max_redirects
         kwargs['allow_redirects'] = self.request_allow_redirects
@@ -151,22 +153,17 @@ class Ant(abc.ABC):
 
         host = req.url.host
         if host not in self.sessions:
-            session = aiohttp.ClientSession(cookies=cookies)
+            session = aiohttp.ClientSession(response_class=Response)
             self.sessions[host] = session
         else:
             session = self.sessions[host]
-            if cookies is not None:
-                session.cookie_jar.update_cookies(cookies)
 
-        async with session.request(**kwargs) as aio_response:
-            await aio_response.read()
-        return self._convert_response(aio_response, req)
-
-    @staticmethod
-    def _convert_response(aio_response: ClientResponse, request: Request) -> Response:
-        return Response(request, aio_response.status, aio_response._content,
-                        headers=aio_response.headers, cookies=aio_response.cookies,
-                        encoding=aio_response._get_encoding())
+        response = await session._request(**kwargs)
+        if not self.response_in_stream:
+            await response.read()
+            response.close()
+            await response.wait_for_close()
+        return response
 
     def report(self, thing: Things, dropped: bool=False) -> None:
         now_time = time.time()

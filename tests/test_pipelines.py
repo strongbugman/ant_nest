@@ -1,9 +1,8 @@
 import os
 import time
-from multidict import CIMultiDictProxy, CIMultiDict
 
 import pytest
-from aiohttp.backport_cookies import SimpleCookie
+from yarl import URL
 
 from ant_nest import *
 
@@ -11,20 +10,22 @@ from ant_nest import *
 @pytest.mark.asyncio
 async def test_pipeline():
     pl = Pipeline()
-    await pl.process(Request(url='test.com'))
+    await pl.process(Request('GET', URL('https://test.com')))
 
 
 def test_response_fileter_error_pipeline():
     pl = ResponseFilterErrorPipeline()
-    res = Response(Request('http://test.com'), 200, b'', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
-    err_res = Response(Request('http://test.com'), 403, b'', CIMultiDictProxy(CIMultiDict()), SimpleCookie())
+    res = Response('GET', URL('https://test.com'))
+    err_res = Response('GET', URL('https://test.com'))
+    res.status = 200
+    err_res.status = 403
     assert res is pl.process(res)
-    assert pl.process(err_res) is None
+    assert isinstance(pl.process(err_res), Exception)
 
 
 def test_request_duplicate_filter_pipeline():
     pl = RequestDuplicateFilterPipeline()
-    req = Request('http://test.com')
+    req = Request('GET', URL('http://test.com'))
     assert pl.process(req) is req
     assert isinstance(pl.process(req), ThingDropped)
 
@@ -80,7 +81,7 @@ async def test_item_json_dump_pipeline():
 
 def test_request_user_agent_pipeline():
     pl = RequestUserAgentPipeline(user_agent='ant')
-    req = Request('www.hi.com')
+    req = Request('GET', URL('https://www.hi.com'))
     assert pl.process(req) is req
     assert req.headers['User-Agent'] == 'ant'
 

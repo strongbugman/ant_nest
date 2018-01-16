@@ -34,7 +34,7 @@ class Pipeline:
 class ResponseFilterErrorPipeline(Pipeline):
     def process(self, thing: Response) -> Union[Things, Exception]:
         if thing.status >= 400:
-            return
+            return ThingDropped('Respose status is {:d}'.format(thing.status))
         else:
             return thing
 
