@@ -1,7 +1,6 @@
 """The thing`s usage is simple, can be created by ant, processed by ants and pipelines"""
 from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, DefaultDict, AnyStr, IO, Callable
 from collections.abc import MutableMapping
-import json
 import abc
 from collections import defaultdict
 import logging
@@ -10,6 +9,7 @@ import re
 from aiohttp import ClientRequest, ClientResponse
 from lxml import html
 import jpath
+import simplejson
 
 from .exceptions import FieldValidationError, ItemExtractError
 
@@ -39,10 +39,10 @@ class Response(ClientResponse):
 
     @property
     def simple_text(self) -> str:
-        return self.get_text()
+        return self.get_text(errors='ignore')
 
     def get_json(self, encoding: Optional[str] = None, decode_errors: str='strict',
-                 loads: Callable=json.loads):
+                 loads: Callable=simplejson.loads):
         if self._text is None:
             text = self.get_text(encoding=encoding, errors=decode_errors)
         else:

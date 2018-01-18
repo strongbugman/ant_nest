@@ -3,7 +3,6 @@ import logging
 from collections import defaultdict
 import json
 import os
-import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import asyncio
@@ -164,21 +163,19 @@ class ItemBaseMysqlPipeline(Pipeline):
         """Parse value to str for making sql string, eg: False -> '0'"""
         if isinstance(value, bool):
             return '1' if value else '0'
-        elif isinstance(value, str):
-            value = value.replace('\"', '\\\"')
-            return '"{:s}"'.format(value)
-        elif isinstance(value, datetime.datetime):
-            return '"{:s}"'.format(str(value))
-        elif isinstance(value, datetime.date):
-            return '"{:s}"'.format(str(value))
+        elif isinstance(value, int) or isinstance(value, float):
+            return str(value)
+        elif isinstance(value, bytes):
+            return 'X\'{:s}\''.format(value.hex())
         elif value is None:
             return 'null'
         else:
-            return str(value)
+            value = str(value).replace('\"', '\\\"')
+            return '"{:s}"'.format(value)
 
 
 class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
-    sql_format = 'INSERT IGNORE INTO {database}.{table} ({fields}) VALUES ({values})'
+    sql_format = 'INSERT IGNORE INTO `{database}`.`{table}` ({fields}) VALUES ({values})'
 
     async def process(self, thing: Item):
         fields = []
@@ -186,14 +183,14 @@ class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
         for k, v in thing.items():
             fields.append(k)
             values.append(self.convert_item_value(v))
-        sql = self.sql_format.format(database=self.database, table=self.table, fields=','.join(fields),
+        sql = self.sql_format.format(database=self.database, table=self.table, fields='`' + '`,`'.join(fields) + '`',
                                      values=','.join(values))
         await self.push_data(sql)
         return thing
 
 
 class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
-    sql_format = 'UPDATE {database}.{table} SET {pairs} WHERE {primary_key}={primary_value}'
+    sql_format = 'UPDATE `{database}`.`{table}` SET {pairs} WHERE `{primary_key}`={primary_value}'
 
     def __init__(self, primary_key: str, host: str, port: int, user: str, password: str, database: str, table: str,
                  charset: str='utf8'):
@@ -208,7 +205,7 @@ class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
             if k == self.primary_key:
                 primary_value = self.convert_item_value(v)
             else:
-                pairs.append('{:s}={:s}'.format(k, self.convert_item_value(v)))
+                pairs.append('`{:s}`={:s}'.format(k, self.convert_item_value(v)))
 
         if primary_value is not None:
             sql = self.sql_format.format(database=self.database, table=self.table, pairs=','.join(pairs),
@@ -218,7 +215,7 @@ class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
 
 
 class ItemMysqlInsertUpdatePipeline(ItemBaseMysqlPipeline):
-    sql_format = 'INSERT INTO {database}.{table} ({fields}) VALUES ({values}) on duplicate key update {pairs}'
+    sql_format = 'INSERT INTO `{database}`.`{table}` ({fields}) VALUES ({values}) on duplicate key update {pairs}'
 
     def __init__(self, update_keys: List[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -233,8 +230,8 @@ class ItemMysqlInsertUpdatePipeline(ItemBaseMysqlPipeline):
             fields.append(k)
             values.append(v)
             if k in self.update_keys:
-                pairs.append('{:s}={:s}'.format(k, v))
-        sql = self.sql_format.format(database=self.database, table=self.table, fields=','.join(fields),
+                pairs.append('`{:s}`={:s}'.format(k, v))
+        sql = self.sql_format.format(database=self.database, table=self.table, fields='`' + '`,`'.join(fields) + '`',
                                      values=','.join(values), pairs=','.join(pairs))
         await self.push_data(sql)
         return thing

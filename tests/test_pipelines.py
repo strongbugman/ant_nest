@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime
 
 import pytest
 from yarl import URL
@@ -121,11 +122,17 @@ async def test_item_mysql_pipeline():
     await bpl.on_spider_open()
     await bpl.push_data('''CREATE TABLE `test` (
                            `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-                           `test` text DEFAULT NULL,
+                           `test` TEXT DEFAULT NULL,
+                           `test_bool` BOOL DEFAULT NULL,
+                           `test_int` INT DEFAULT NULL,
+                           `test_float` FLOAT DEFAULT NULL,
+                           `test_bytes` BLOB DEFAULT NULL,
+                           `test_datetime` DATETIME DEFAULT NULL,
                            PRIMARY KEY (`id`)
                            ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;''')
 
-    test_item = Item(test='I ant')
+    test_item = Item(test='I ant', test_bool=False, test_int=1, test_float=0.3, test_bytes=b'\xf0\x9f\x91\x8d',
+                     test_datetime=datetime.now())
     ibpl = ItemMysqlInsertPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
                                    database=mysql_database, table='test')
     await ibpl.on_spider_open()
