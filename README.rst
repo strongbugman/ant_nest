@@ -134,4 +134,6 @@ concurrent limit, but it`s complex to get the balance between performance and li
 Todo
 ====
 
+* Create "setting.py" from CLI
+* Nested data(html and json) extractor
 * Log system

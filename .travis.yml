@@ -15,9 +15,8 @@ before_install:
 - docker run -d -p 8080:8080 kennethreitz/httpbin
 - docker run -d -p 3128:8888 dannydirect/tinyproxy ANY
 install:
-- python setup.py install
 - pip install codecov
-script: pytest --cov=./
+script: python setup.py test --addopts='--cov=.'
 after_success:
 - codecov
 deploy:
