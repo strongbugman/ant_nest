@@ -135,5 +135,5 @@ Todo
 ====
 
 * Create "setting.py" from CLI
-* Nested data(html and json) extractor
+* Nested data(html and json) extractor, done
 * Log system
