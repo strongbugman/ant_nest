@@ -20,6 +20,14 @@ def test_response():
     assert res.simple_text == '1'
     assert res.simple_json == 1
 
+    res = Response('GET', req.url)
+    res._content = None
+    with pytest.raises(ValueError):
+        res.get_text()
+    res._content = b'1'
+    res._get_encoding = lambda: 'utf-8'
+    assert res.get_text() == '1'
+
 
 def test_field():
     name = 'test'
@@ -88,6 +96,7 @@ def test_item():
 
     item = TestItem()
     assert item.x == 10
+    assert dict(item.items()) == {'x': 10}
     with pytest.raises(FieldValidationError):
         item.validate()
     item.z = 1
@@ -143,15 +152,35 @@ def test_extract():
     # extract single value with ValueError
     with pytest.raises(ValueError):
         ItemExtractor.extract_value('something else', 'test', 'test')
+    # ItemNestExtractor tests
+    with open('./tests/test.html', 'rb') as f:
+        response = Response('GET', request.url)
+        response._content = f.read()
+        response.get_text(encoding='utf-8')
+    item_nest_extractor = ItemNestExtractor('xpath', '//div[@id="nest"]/div', Item)
+    item_nest_extractor.add_xpath('xpath', './p/text()')
+    item_nest_extractor.add_regex('regex', 'regex(\d+)</')
+    temp = 1
+    for item in item_nest_extractor.extract_items(response):
+        assert item.xpath == str(temp)
+        assert item.regex == str(temp)
+        temp += 1
+
+    with pytest.raises(NotImplementedError):
+        item_nest_extractor.extract(response)
     # extract with wrappers
     with open('./tests/test.html', 'rb') as f:
         response = Response('GET', request.url)
         response._content = f.read()
         response.get_text(encoding='utf-8')
     assert extract_value_by_xpath('/html/body/div/p/text()', response.html_element) == 'test'
+    assert extract_value_by_xpath('/html/body/div/p/text()', response) == 'test'
+    assert extract_value_by_xpath('//a/text()', '<a>test</a>', ignore_exception=False) == 'test'
     assert extract_value_by_jpath('a', {'a': 1}) == 1
+    assert extract_value_by_jpath('a', '{"a": 1}') == 1
     assert extract_value_by_regex('(\d+)', 'I have 2 apples') == '2'
-    assert extract_value_by_jpath('a', {}) is None
+    assert extract_value_by_jpath('a', {'a': None}) is None
+    assert extract_value_by_jpath('a', {}) is None  # default
     assert extract_value_by_jpath('a', {}, default=1) == 1
     with pytest.raises(Exception):
         extract_value_by_jpath('a', None, ignore_exception=False)
