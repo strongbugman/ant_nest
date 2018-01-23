@@ -95,8 +95,8 @@ def test_item():
         z = IntField()
 
     item = TestItem()
-    assert item.x == 10
     assert dict(item.items()) == {'x': 10}
+    assert item.x == 10
     with pytest.raises(FieldValidationError):
         item.validate()
     item.z = 1
@@ -105,9 +105,24 @@ def test_item():
     item = TestItem(z=10, a=1)
     assert item.z == 10
     assert item.a == 1
-
+    # repr and str
     item.__repr__()
     item.__str__()
+    # subclass
+
+    class SubItem(TestItem):
+        a = FloatField()
+
+    item = SubItem()
+    assert dict(item.items()) == {'x': 10}
+    assert item.x == 10
+    item.a = '1.1'
+    with pytest.raises(FieldValidationError):  # raise because of "item.z" is not set
+        item.validate()
+    item.z = '1'
+    item.validate()
+    assert item.a == 1.1
+    assert item.z == 1
 
 
 def test_extract():
