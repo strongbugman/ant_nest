@@ -122,12 +122,22 @@ class BytesField(IntField):
     _type = bytes
 
 
+# store all item class`s field reference
+_fields = defaultdict(dict)  # type: DefaultDict['Item', Dict[str, IntField]]
+
+
 class ItemMeta(abc.ABCMeta):
     def __init__(cls, name: str, bases: Tuple[type, ...], attr_dict: Dict[str, Any]):
         super().__init__(name, bases, attr_dict)
         for k, v in attr_dict.items():
             if isinstance(v, IntField):
+                _fields[cls][k] = v
                 v.storage_name = IntField.make_shadow_name(k)
+        # fetch all fields from base class
+        for base_cls in bases:
+            if base_cls in _fields:
+                # base item class`s fields must have been set
+                _fields[cls].update(_fields[base_cls])
 
 
 class Item(MutableMapping, metaclass=ItemMeta):
@@ -135,11 +145,9 @@ class Item(MutableMapping, metaclass=ItemMeta):
         for k, v in kwargs.items():
             setattr(self, k, v)
         # default field value
-        class_dict = self.__class__.__dict__
-        for k, obj in class_dict.items():
-            if isinstance(obj, IntField):
-                if not isinstance(obj.default, CustomNoneType) and k not in self:
-                    setattr(self, k, obj.default)
+        for k, obj in _fields[self.__class__].items():
+            if not isinstance(obj.default, CustomNoneType) and k not in self:
+                setattr(self, k, obj.default)
 
     def __setattr__(self, key: str, value: Any) -> None:
         if isinstance(key, str):
@@ -179,15 +187,13 @@ class Item(MutableMapping, metaclass=ItemMeta):
 
     def validate(self):
         """Validate item`s type.
-        Get descriptors reference method from __class__.__dict__"""
-        class_dict = self.__class__.__dict__
-        for k, obj in class_dict.items():
-            if isinstance(obj, IntField):
-                if k in self:
-                    setattr(self, k, class_dict[k].validate(getattr(self, k)))
-                elif not obj.null:
-                    raise FieldValidationError(
-                        '\'{:s}.{:s}\' have no value yet'.format(self.__class__.__name__, k))
+        Get descriptors reference method from _fields"""
+        for k, obj in _fields[self.__class__].items():
+            if k in self:
+                setattr(self, k, obj.validate(getattr(self, k)))
+            elif not obj.null:
+                raise FieldValidationError(
+                    '\'{:s}.{:s}\' have no value yet'.format(self.__class__.__name__, k))
 
     def __repr__(self):
         return '{:s}: {:s}'.format(self.__class__.__name__, str(dict(self)))
