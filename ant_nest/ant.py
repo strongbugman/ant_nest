@@ -8,6 +8,7 @@ from collections import defaultdict
 import aiohttp
 from aiohttp.client import DEFAULT_TIMEOUT
 from aiohttp import ClientSession
+from aiohttp.connector import TCPConnector
 import async_timeout
 from yarl import URL
 from tenacity import retry
@@ -34,16 +35,20 @@ class Ant(abc.ABC):
     request_max_redirects = 10
     request_allow_redirects = True
     response_in_stream = False
+    connection_limit = 100  # see "TCPConnector" in "aiohttp"
+    connection_limit_per_host = 0
 
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.sessions = {}  # type: Dict[str, ClientSession]
         # report var
         self._reports = defaultdict(lambda: [0, 0])  # type: DefaultDict[str, List[int, int]]
         self._drop_reports = defaultdict(lambda: [0, 0])  # type: DefaultDict[str, List[int, int]]
         self._start_time = time.time()
         self._last_time = self._start_time
         self._report_slot = 60  # report once after one minute by default
+        self._session = ClientSession(response_class=Response,
+                                      connector=TCPConnector(limit=self.connection_limit,
+                                                             limit_per_host=self.connection_limit_per_host))
 
     async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None,
                       headers: Optional[dict]=None, cookies: Optional[dict]=None,
@@ -89,9 +94,9 @@ class Ant(abc.ABC):
                     await obj
             except Exception as e:
                 self.logger.exception('Close pipelines with ' + e.__class__.__name__)
-        # close cached sessions
-        for session in self.sessions.values():
-            await session.close()
+
+        await self._session.close()
+
         self.logger.info('Closed')
 
     @abc.abstractmethod
@@ -147,18 +152,9 @@ class Ant(abc.ABC):
         # proxy auth not work when one session with many requests, add auth header to fix it
         proxy = None if kwargs['proxy'] is None else URL(kwargs['proxy'])
         if proxy is not None and proxy.user is not None:
-            if kwargs['headers'] is None:
-                kwargs['headers'] = dict()
             kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = aiohttp.BasicAuth.from_url(proxy).encode()
 
-        host = req.url.host
-        if host not in self.sessions:
-            session = aiohttp.ClientSession(response_class=Response)
-            self.sessions[host] = session
-        else:
-            session = self.sessions[host]
-
-        response = await session._request(**kwargs)
+        response = await self._session._request(**kwargs)
         if not self.response_in_stream:
             await response.read()
             response.close()
