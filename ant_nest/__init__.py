@@ -38,13 +38,10 @@ def extract_value_by_regex(path: str, data: Any, extract_type: str=ItemExtractor
                          default=default)
 
 
-class __CliAnt(Ant):
+class CliAnt(Ant):
     async def run(self):
         pass
 
 
-cli_ant = __CliAnt()
-
-
 __all__ = ['queen'] + ant.__all__ + cli.__all__ + pipelines.__all__ + exceptions.__all__ +\
-          things.__all__ + ['extract_value_by_jpath', 'extract_value_by_regex', 'extract_value_by_xpath', 'cli_ant']
+          things.__all__ + ['extract_value_by_jpath', 'extract_value_by_regex', 'extract_value_by_xpath']
