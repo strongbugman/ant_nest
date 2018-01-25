@@ -67,8 +67,9 @@ def main():
     sys.path.append(os.getcwd())
     try:
         import settings
-    except ImportError:
-        print('Please create "settings.py" in project root directory or use the command in project root directory')
+    except ImportError as e:
+        print(e)
+        print('Are "settings.py" created?')
         exit(-1)
     try:
         ants = get_ants(settings.ANT_PACKAGES)
