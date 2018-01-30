@@ -86,10 +86,7 @@ def main():
     elif args.ant is not None:
         ant_name = args.ant
         if ant_name in ants:
-            loop = getattr(settings, 'EVENT_LOOP', asyncio.get_event_loop())
-            limit = getattr(settings, 'COROUTINE_CONCURRENT_LIMIT', None)
-            queen.reset_concurrent_limit(limit)
-            loop.run_until_complete(run_ant(ants[ant_name]))
+            asyncio.get_event_loop().run_until_complete(run_ant(ants[ant_name]))
         else:
             print('Can not find ant by the name "{:s}"'.format(ant_name))
             exit(-1)
