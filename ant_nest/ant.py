@@ -47,7 +47,7 @@ class Ant(abc.ABC):
         self._last_time = self._start_time
         self._report_slot = 60  # report once after one minute by default
         self._session = ClientSession(response_class=Response,
-                                      connector=TCPConnector(limit=self.connection_limit,
+                                      connector=TCPConnector(limit=self.connection_limit, enable_cleanup_closed=True,
                                                              limit_per_host=self.connection_limit_per_host))
 
     async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None,
