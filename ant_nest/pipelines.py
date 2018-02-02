@@ -19,13 +19,17 @@ class Pipeline:
         self.logger = logging.getLogger(self.__class__.__name__)
 
     async def on_spider_open(self) -> None:
-        """Call when ant open, method or coroutine"""
+        """Call when ant open, this method can be coroutine function"""
 
     async def on_spider_close(self) -> None:
-        """Call when ant close, method or coroutine"""
+        """Call when ant close, this method can be coroutine function"""
 
-    async def process(self, thing: Things) -> Union[Things, Exception]:
-        """method or coroutine"""
+    async def process(self, thing: Things) -> Things:
+        """Process things, this method can be coroutine function
+        Raise ThingDropped when drop one thing
+
+        :raise ThingDropped
+        """
         return thing
 
 
@@ -33,7 +37,7 @@ class Pipeline:
 class ResponseFilterErrorPipeline(Pipeline):
     def process(self, thing: Response) -> Union[Things, Exception]:
         if thing.status >= 400:
-            return ThingDropped('Respose status is {:d}'.format(thing.status))
+            raise ThingDropped('Respose status is {:d}'.format(thing.status))
         else:
             return thing
 
@@ -46,7 +50,7 @@ class RequestDuplicateFilterPipeline(Pipeline):
 
     def process(self, thing: Request) -> Union[Things, Exception]:
         if thing.url in self.__request_urls:
-            return ThingDropped('Request duplicate!')
+            raise ThingDropped('Request duplicate!')
         else:
             self.__request_urls.add(thing.url)
             return thing
@@ -80,7 +84,7 @@ class ItemValidatePipeline(Pipeline):
             thing.validate()
             return thing
         except FieldValidationError as e:
-            return e
+            raise ThingDropped('Validation failed') from e
 
 
 class ItemFieldReplacePipeline(Pipeline):

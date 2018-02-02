@@ -21,14 +21,16 @@ def test_response_fileter_error_pipeline():
     res.status = 200
     err_res.status = 403
     assert res is pl.process(res)
-    assert isinstance(pl.process(err_res), Exception)
+    with pytest.raises(ThingDropped):
+        pl.process(err_res)
 
 
 def test_request_duplicate_filter_pipeline():
     pl = RequestDuplicateFilterPipeline()
     req = Request('GET', URL('http://test.com'))
     assert pl.process(req) is req
-    assert isinstance(pl.process(req), ThingDropped)
+    with pytest.raises(ThingDropped):
+        pl.process(req)
 
 
 class TItem(Item):
@@ -48,7 +50,8 @@ def test_item_validate_pipeline():
     pl = ItemValidatePipeline()
     item = TItem()
     item.count = '3'
-    assert isinstance(pl.process(item), FieldValidationError)
+    with pytest.raises(ThingDropped):
+        pl.process(item)
 
     item.info = 'hi'
     pl.process(item)

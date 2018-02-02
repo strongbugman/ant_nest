@@ -19,6 +19,7 @@ from tenacity.stop import stop_after_attempt
 from .pipelines import Pipeline
 from .things import Request, Response, Item, Things
 from . import queen
+from .exceptions import ThingDropped
 
 
 __all__ = ['Ant']
@@ -133,13 +134,15 @@ class Ant(abc.ABC):
         self.logger.debug('Process thing: ' + str(thing))
         raw_thing = thing
         for pipeline in pipelines:
-            thing = pipeline.process(thing)
-            if isinstance(thing, Coroutine):
-                with async_timeout.timeout(timeout):
-                    thing = await thing
-            if isinstance(thing, Exception):
-                self.report(raw_thing, dropped=True)
-                raise thing
+            try:
+                thing = pipeline.process(thing)
+                if isinstance(thing, Coroutine):
+                    with async_timeout.timeout(timeout):
+                        thing = await thing
+            except Exception as e:
+                if isinstance(e, ThingDropped):
+                    self.report(raw_thing, dropped=True)
+                raise e
         return thing
 
     async def _request(self, req: Request) -> Response:

@@ -130,7 +130,7 @@ async def test_pipelines():
 
     class TestPipeline(Pipeline):
         async def process(self, thing):
-            return TypeError('Test error')
+            raise TypeError('Test error')
 
         def on_spider_open(self):
             raise TypeError('Test error')
