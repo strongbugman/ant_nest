@@ -11,7 +11,7 @@ setup_require = ['pytest-runner>=3.0']
 
 setup(
     name="ant_nest",
-    version="0.28.0",
+    version="0.29.0",
     url='https://github.com/6ugman/ant_nest',
     description='A simple and clear Web Crawler framework build on python3.6+ with async',
     long_description=open('README.rst').read(),

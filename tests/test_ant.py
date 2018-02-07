@@ -225,13 +225,19 @@ async def test_with_real_request():
     res = await ant.request(httpbin_base_url + 'redirect/3')
     assert res.status == 302
     assert ant._reports['Request'][1] > 12
-    # with proxy
-    proxy = os.getenv('TEST_PROXY', 'http://localhost:3128')
-    ant.request_proxy = proxy
+    # with http proxy
+    proxy = os.getenv('TEST_HTTP_PROXY', 'http://localhost:3128')
+    ant.request_proxies.append(proxy)
+    res = await ant.request('http://httpbin.org/anything')
+    assert res.status == 200
+    # with socks5 proxy
+    proxy = os.getenv('TEST_SOCKS5_PROXY', 'socks5://localhost:1081')
+    ant.request_proxies.pop()
+    ant.request_proxies.append(proxy)
     res = await ant.request('http://httpbin.org/anything')
     assert res.status == 200
     # with stream
-    ant.request_proxy = None
+    ant.request_proxies.pop()
     ant.response_in_stream = True
     res = await ant.request('http://httpbin.org/anything')
     assert res.status == 200
