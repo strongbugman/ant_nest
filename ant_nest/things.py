@@ -6,7 +6,8 @@ from collections import defaultdict
 import logging
 import re
 
-from aiohttp import ClientRequest, ClientResponse
+from aiohttp import ClientResponse
+from aiosocks.connector import ProxyClientRequest
 from lxml import html
 import jpath
 import simplejson
@@ -14,7 +15,7 @@ import simplejson
 from .exceptions import FieldValidationError, ItemExtractError
 
 
-class Request(ClientRequest):
+class Request(ProxyClientRequest):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # store data obj
