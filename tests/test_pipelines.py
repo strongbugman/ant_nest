@@ -94,7 +94,7 @@ def test_request_user_agent_pipeline():
 async def test_item_email_pipeline():
 
     class TestPipeline(ItemEmailPipeline):
-        async def open_smtp(self):
+        async def create_smtp(self):
 
             class FakeSMTP:
                 async def send_message(self, msg):
@@ -122,7 +122,7 @@ async def test_item_mysql_pipeline():
 
     bpl = ItemBaseMysqlPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
                                 database=mysql_database, table='test')
-    await bpl.on_spider_open()
+    pool = await bpl.create_pool()
     await bpl.push_data('''CREATE TABLE `test` (
                            `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
                            `test` TEXT DEFAULT NULL,
@@ -132,7 +132,7 @@ async def test_item_mysql_pipeline():
                            `test_bytes` BLOB DEFAULT NULL,
                            `test_datetime` DATETIME DEFAULT NULL,
                            PRIMARY KEY (`id`)
-                           ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;''')
+                           ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;''', pool)
 
     test_item = Item(test='I ant', test_bool=False, test_int=1, test_float=0.3, test_bytes=b'\xf0\x9f\x91\x8d',
                      test_datetime=datetime.now())
@@ -140,7 +140,7 @@ async def test_item_mysql_pipeline():
                                    database=mysql_database, table='test')
     await ibpl.on_spider_open()
     assert test_item is await ibpl.process(test_item)
-    data = await ibpl.pull_data('SELECT * FROM test')
+    data = await ibpl.pull_data('SELECT * FROM test', ibpl.pool)
     assert test_item.test == data[0]['test']
 
     ubpl = ItemMysqlUpdatePipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
@@ -149,11 +149,11 @@ async def test_item_mysql_pipeline():
     test_item.id = data[0]['id']
     test_item.test = 'I ANT'
     assert test_item is await ubpl.process(test_item)
-    data = await ubpl.pull_data('SELECT * FROM test')
+    data = await ubpl.pull_data('SELECT * FROM test', ubpl.pool)
     assert test_item.test == data[0]['test']
     test_item.test = 'I ant'
     assert test_item is await ubpl.process(test_item)
-    data = await ubpl.pull_data('SELECT * FROM test')
+    data = await ubpl.pull_data('SELECT * FROM test', ubpl.pool)
     assert test_item.test == data[0]['test']
 
     iubpl = ItemMysqlInsertUpdatePipeline(
@@ -163,11 +163,25 @@ async def test_item_mysql_pipeline():
     await iubpl.on_spider_open()
     test_item.test = 'I love ant!'
     assert test_item is await iubpl.process(test_item)
-    data = await iubpl.pull_data('SELECT * FROM test')
+    data = await iubpl.pull_data('SELECT * FROM test', iubpl.pool)
     assert test_item.test == data[0]['test']
 
     await ubpl.on_spider_close()
     await ibpl.on_spider_close()
     await iubpl.on_spider_close()
-    await bpl.push_data('DROP TABLE test;')
-    await bpl.on_spider_close()
+    await bpl.push_data('DROP TABLE test;', pool)
+    pool.close()
+    await pool.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_redis_pipeline():
+    redis_address = os.getenv('TEST_REDIS_ADDRESS', 'redis://localhost:6379')
+    pl = ItemBaseRedisPipeline(redis_address)
+    pool = await pl.create_redis()
+    with await pool as conn:
+        value = 'value'
+        await conn.set('key', value)
+        assert await conn.get('key') == value
+    pool.close()
+    await pool.wait_closed()

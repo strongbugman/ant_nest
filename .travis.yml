@@ -13,6 +13,8 @@ before_install:
 - docker pull kennethreitz/httpbin
 - docker pull dannydirect/tinyproxy
 - docker pull vimagick/delegated
+- docker pull redis
+- docker run -d -p 6379:6379 redis
 - docker run -d -p 8080:8080 kennethreitz/httpbin
 - docker run -d -p 3128:8888 dannydirect/tinyproxy ANY
 - docker run -d --name delegate -p 1081:1080 vimagick/delegated -P1080 SERVER=socks
