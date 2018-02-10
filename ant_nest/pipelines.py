@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 import asyncio
 
 import aiomysql
+import aioredis
 import aiosmtplib
 
 from .things import Things, Response, Request, Item
@@ -136,28 +137,23 @@ class ItemBaseMysqlPipeline(Pipeline):
         self.database = database
         self.table = table
         self.charset = charset
-        self.pool = None
 
-    async def on_spider_open(self) -> None:
-        self.pool = await aiomysql.create_pool(host=self.host, port=self.port, user=self.user, password=self.password,
-                                               db=self.database, charset=self.charset, use_unicode=True)
+    async def create_pool(self) -> aiomysql.Pool:
+        return await aiomysql.create_pool(host=self.host, port=self.port, user=self.user, password=self.password,
+                                          db=self.database, charset=self.charset, use_unicode=True)
 
-    async def on_spider_close(self) -> None:
-        self.pool.close()
-        await self.pool.wait_closed()
-
-    async def push_data(self, sql: str) -> None:
+    async def push_data(self, sql: str, pool: aiomysql.Pool) -> None:
         """Run SQL without pulling data like "INSERT" and "UPDATE" command"""
         self.logger.debug('Executing SQL: ' + sql)
-        async with self.pool.get() as conn:
+        async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(sql)
             await conn.commit()
 
-    async def pull_data(self, sql: str) -> Tuple[Dict[str, Any]]:
+    async def pull_data(self, sql: str, pool: aiomysql.Pool) -> Tuple[Dict[str, Any]]:
         """Run SQL with pulling data like "SELECT" command"""
         self.logger.debug('Executing SQL: ' + sql)
-        async with self.pool.get() as conn:
+        async with pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cur:
                 await cur.execute(sql)
                 return await cur.fetchall()
@@ -181,6 +177,17 @@ class ItemBaseMysqlPipeline(Pipeline):
 class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
     sql_format = 'INSERT IGNORE INTO `{database}`.`{table}` ({fields}) VALUES ({values})'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pool = None
+
+    async def on_spider_open(self) -> None:
+        self.pool = await self.create_pool()
+
+    async def on_spider_close(self) -> None:
+        self.pool.close()
+        await self.pool.wait_closed()
+
     async def process(self, thing: Item):
         fields = []
         values = []
@@ -189,11 +196,11 @@ class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
             values.append(self.convert_item_value(v))
         sql = self.sql_format.format(database=self.database, table=self.table, fields='`' + '`,`'.join(fields) + '`',
                                      values=','.join(values))
-        await self.push_data(sql)
+        await self.push_data(sql, self.pool)
         return thing
 
 
-class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
+class ItemMysqlUpdatePipeline(ItemMysqlInsertPipeline):
     sql_format = 'UPDATE `{database}`.`{table}` SET {pairs} WHERE `{primary_key}`={primary_value}'
 
     def __init__(self, primary_key: str, host: str, port: int, user: str, password: str, database: str, table: str,
@@ -214,11 +221,11 @@ class ItemMysqlUpdatePipeline(ItemBaseMysqlPipeline):
         if primary_value is not None:
             sql = self.sql_format.format(database=self.database, table=self.table, pairs=','.join(pairs),
                                          primary_key=self.primary_key, primary_value=primary_value)
-            await self.push_data(sql)
+            await self.push_data(sql, self.pool)
         return thing
 
 
-class ItemMysqlInsertUpdatePipeline(ItemBaseMysqlPipeline):
+class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
     sql_format = 'INSERT INTO `{database}`.`{table}` ({fields}) VALUES ({values}) on duplicate key update {pairs}'
 
     def __init__(self, update_keys: List[str], *args, **kwargs):
@@ -237,7 +244,7 @@ class ItemMysqlInsertUpdatePipeline(ItemBaseMysqlPipeline):
                 pairs.append('`{:s}`={:s}'.format(k, v))
         sql = self.sql_format.format(database=self.database, table=self.table, fields='`' + '`,`'.join(fields) + '`',
                                      values=','.join(values), pairs=','.join(pairs))
-        await self.push_data(sql)
+        await self.push_data(sql, self.pool)
         return thing
 
 
@@ -254,7 +261,7 @@ class ItemBaseEmailPipeline(Pipeline):
         self.starttls = starttls
         self.tls = tls
 
-    async def open_smtp(self) -> aiosmtplib.SMTP:
+    async def create_smtp(self) -> aiosmtplib.SMTP:
         smtp = aiosmtplib.SMTP()
         if self.starttls:
             await smtp.connect(self.server, self.port, use_tls=False)
@@ -292,9 +299,28 @@ class ItemEmailPipeline(ItemBaseEmailPipeline):
         return thing
 
     async def on_spider_close(self) -> None:
-        smtp = await self.open_smtp()
+        smtp = await self.create_smtp()
         await self.send(smtp, self.title, '\n'.join(item.__repr__() for item in self.items))
         smtp.close()
+
+
+class ItemBaseRedisPipeline(Pipeline):
+    def __init__(self, address: str, db: Optional[int]=None, password: Optional[str]=None, encoding: str='utf-8',
+                 minsize: int=1, maxsize: int=10, ssl: Optional[bool]=None, timeout: Optional[float]=None):
+        super().__init__()
+        self.address = address
+        self.db = db
+        self.password = password
+        self.encoding = encoding
+        self.minsize = minsize
+        self.maxsize = maxsize
+        self.ssl = ssl
+        self.timeout = timeout
+
+    async def create_redis(self) -> aioredis.ConnectionsPool:
+        return await aioredis.create_redis_pool(
+            self.address, db=self.db, password=self.password,encoding=self.encoding, minsize=self.minsize,
+            maxsize=self.maxsize, ssl=self.ssl, timeout=self.timeout)
 
 
 __all__ = [var for var in vars().keys() if 'Pipeline' in var]
