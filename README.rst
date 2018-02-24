@@ -6,10 +6,10 @@ AntNest
    :target: https://pypi.python.org/pypi/ant_nest
 
 .. image:: https://img.shields.io/travis/6ugman/ant_nest/master.svg
-   :target: https://travis-ci.org/6ugman/ant_nest
+   :target: https://travis-ci.org/strongbugman/ant_nest
 
 .. image:: https://codecov.io/gh/6ugman/ant_nest/branch/master/graph/badge.svg
-  :target: https://codecov.io/gh/6ugman/ant_nest
+  :target: https://codecov.io/gh/strongbugman/ant_nest
 
 Overview
 ========
