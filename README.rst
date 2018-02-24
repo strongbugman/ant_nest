@@ -5,10 +5,10 @@ AntNest
 .. image:: https://img.shields.io/pypi/v/ant_nest.svg
    :target: https://pypi.python.org/pypi/ant_nest
 
-.. image:: https://img.shields.io/travis/6ugman/ant_nest/master.svg
+.. image:: https://img.shields.io/travis/strongbugman/ant_nest/master.svg
    :target: https://travis-ci.org/strongbugman/ant_nest
 
-.. image:: https://codecov.io/gh/6ugman/ant_nest/branch/master/graph/badge.svg
+.. image:: https://codecov.io/gh/strongbugman/ant_nest/branch/master/graph/badge.svg
   :target: https://codecov.io/gh/strongbugman/ant_nest
 
 Overview
