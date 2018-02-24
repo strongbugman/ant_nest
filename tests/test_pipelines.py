@@ -90,6 +90,25 @@ def test_request_user_agent_pipeline():
     assert req.headers['User-Agent'] == 'ant'
 
 
+def test_request_random_user_agent_pipeline():
+    pl = RequestRandomUserAgentPipeline()
+    req = Request('GET', URL('https://www.hi.com'), headers={'User-Agent': ''})
+    assert pl.process(req) is req
+    assert req.headers['User-Agent'] != ''
+    assert pl.create() != pl.create()
+
+    with pytest.raises(ValueError):
+        RequestRandomUserAgentPipeline(system='something')
+
+    with pytest.raises(ValueError):
+        RequestRandomUserAgentPipeline(browser='something')
+
+    pl = RequestRandomUserAgentPipeline(system='UnixLike', browser='Firefox')
+    user_agent = pl.create()
+    assert 'X11' in user_agent
+    assert 'Firefox' in user_agent
+
+
 @pytest.mark.asyncio
 async def test_item_email_pipeline():
 

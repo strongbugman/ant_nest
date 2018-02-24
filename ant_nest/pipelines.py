@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union
+from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union, Sequence
 import logging
 from collections import defaultdict
 import json
@@ -6,6 +6,8 @@ import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import asyncio
+import random
+import re
 
 import aiomysql
 import aioredis
@@ -58,18 +60,105 @@ class RequestDuplicateFilterPipeline(Pipeline):
 
 
 class RequestUserAgentPipeline(Pipeline):
-    user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/537.36 (KHTML, like Gecko)' \
-                 'Chrome/62.0.3202.89 Safari/537.36 Name'
+    user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ' \
+                 'Chrome/51.0.2704.103 Safari/537.36'
 
     def __init__(self, user_agent=user_agent):
         super().__init__()
         self.user_agent = user_agent
 
-    def process(self, thing):
-        if thing.headers is None:
-            thing.headers = {}
+    def process(self, thing: Request) -> Request:
         thing.headers['User-Agent'] = self.user_agent
         return thing
+
+
+class RequestRandomUserAgentPipeline(Pipeline):
+    """Create simple and common user agent for request by random,
+    It`s easy to add new rule.
+    """
+    USER_AGENT_FORMAT = 'Mozilla/5.0 ({system}) {browser}'
+    SYSTEM_FORMATS = {
+        'UnixLike': 'X11; {unix-like_os} {cpu_type}',
+        'MacOS': 'Macintosh; Intel Mac OS X {macos_version}',
+        'Windows': 'Windows NT {windows_version}',
+        'Android': 'Android {android_version}; Linux',
+        'iOS': '{ios_driver}; CPU OS {ios_version} like Mac OS X',
+    }
+    BROWSER_FORMATS = {
+        'Firefox': 'Gecko/20100101 Firefox/{firefox_version}',
+        'Safari': 'AppleWebKit/{webkit_version} (KHTML, like Gecko) Version/{safari_version} Safari/{safari_version2}',
+        'Chrome': 'AppleWebKit/{webkit_version} (KHTML, like Gecko) Chrome/{chrome_version} Safari/{safari_version2}',
+    }
+    FORMAT_VARS = {
+        'unix-like_os': ('Linux', 'FreeBSD'),
+        'cpu_type': ('x86_64', 'i386', 'amd64'),
+        'macos_version': ('10_10_1', '10_11_1', '10_11_2', '10_12_2', '10_12_3', '10_13_3'),
+        'windows_version': ('5_0', '5_1', '5_2', '6_0', '6_1', '10_0'),
+        'android_version': ('4_4', '5_0', '5_1', '6_0', '6_1', '7_0', '7_1', '8_0'),
+        'ios_driver': ('iPone', 'iPod', 'iPad'),
+        'ios_version': ('6_0', '7_0', '8_1', '9_2', '10_3', '10_2_3', '11_3_3'),
+        'firefox_version': ('27.3', '28.0', '31.0', '40.1'),
+        'webkit_version': ('533.18.1', '533.19.4', '533.20.25', '534.55.3'),
+        'safari_version': ('4.0.1', '5.0.4', '5.1.3', '6.0', '7.0.3'),
+        'safari_version2': ('530.19.1', '531.9', '533.16', '533.20.27'),
+        'chrome_version': ('41.0.2226.0', '60.0.1325.223', '62.0.1532.123', '64.0.3282.119')
+    }
+
+    def __init__(self, system: str = 'random', browser: str = 'random'):
+        if system != 'random' and system not in self.SYSTEM_FORMATS.keys():
+            raise ValueError('The system {:s} is not supported!'.format(system))
+        if browser != 'random' and browser not in self.BROWSER_FORMATS.keys():
+            raise ValueError('The browser {:s} is not supported!'.format(browser))
+
+        self.system = system
+        self.browser = browser
+        super().__init__()
+
+    @staticmethod
+    def choice(data: Sequence[str]) -> str:
+        return random.choice(data)
+
+    def _format(self, pattern: str) -> str:
+        """format system or browser pattern string"""
+        kv = {}
+        keys = re.findall('{(\S+?)}', pattern)
+
+        for key in keys:
+            kv[key] = self.choice(self.FORMAT_VARS[key])
+
+        return pattern.format(**kv)
+
+    def create(self) -> str:
+        if self.system != 'random':
+            system_format = self.SYSTEM_FORMATS[self.system]
+        else:
+            system_format = self.SYSTEM_FORMATS[self.choice(list(self.SYSTEM_FORMATS.keys()))]
+
+        if self.browser != 'random':
+            browser_format = self.BROWSER_FORMATS[self.browser]
+        else:
+            browser_format = self.BROWSER_FORMATS[self.choice(list(self.BROWSER_FORMATS.keys()))]
+
+        return self.USER_AGENT_FORMAT.format(system=self._format(system_format), browser=self._format(browser_format))
+
+    def process(self, thing: Request) -> Request:
+        thing.headers['User-Agent'] = self.create()
+        return thing
+
+
+class RequestRandomComputerUserAgentPipeline(Pipeline):
+    SYSTEM_FORMATS = {
+        'UnixLike': 'X11; {unix-like_os} {cpu_type}',
+        'MacOS': 'Macintosh; Intel Mac OS X {macos_version}',
+        'Windows': 'Windows NT {windows_version}',
+    }
+
+
+class RequestRandomMobileUserAgentPipeline(Pipeline):
+    SYSTEM_FORMATS = {
+        'Android': 'Android {android_version}; Linux',
+        'iOS': '{ios_driver}; CPU OS {ios_version} like Mac OS X',
+    }
 
 
 # Item pipelines
@@ -89,7 +178,7 @@ class ItemValidatePipeline(Pipeline):
 
 
 class ItemFieldReplacePipeline(Pipeline):
-    def __init__(self, fields: List[str], excess_chars: Tuple[str]=('\r', '\n', '\t')):
+    def __init__(self, fields: List[str], excess_chars: Tuple[str] = ('\r', '\n', '\t')):
         self.fields = fields
         self.excess_chars = excess_chars
         super().__init__()
@@ -113,7 +202,7 @@ class ItemBaseJsonDumpPipeline(Pipeline):
 
 
 class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
-    def __init__(self, file_dir: str='.'):
+    def __init__(self, file_dir: str = '.'):
         super().__init__()
         self.file_dir = file_dir
         self.data = defaultdict(list)  # type: DefaultDict[str, List[Dict]]
@@ -128,7 +217,8 @@ class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
 
 
 class ItemBaseMysqlPipeline(Pipeline):
-    def __init__(self, host: str, port: int, user: str, password: str, database: str, table: str, charset: str='utf8'):
+    def __init__(self, host: str, port: int, user: str, password: str, database: str, table: str,
+                 charset: str = 'utf8'):
         super().__init__()
         self.host = host
         self.port = port
@@ -188,7 +278,7 @@ class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
         self.pool.close()
         await self.pool.wait_closed()
 
-    async def process(self, thing: Item):
+    async def process(self, thing: Item) -> Item:
         fields = []
         values = []
         for k, v in thing.items():
@@ -204,7 +294,7 @@ class ItemMysqlUpdatePipeline(ItemMysqlInsertPipeline):
     sql_format = 'UPDATE `{database}`.`{table}` SET {pairs} WHERE `{primary_key}`={primary_value}'
 
     def __init__(self, primary_key: str, host: str, port: int, user: str, password: str, database: str, table: str,
-                 charset: str='utf8'):
+                 charset: str = 'utf8'):
         super().__init__(host, port, user, password, database, table, charset=charset)
         self.primary_key = primary_key
 
@@ -250,7 +340,7 @@ class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
 
 class ItemBaseEmailPipeline(Pipeline):
     def __init__(self, account: str, password: str, server: str, port: int, recipients: List[str],
-                 sender_name: str='AntNest.ItemEmailPipeline', tls: bool=False, starttls: bool=False):
+                 sender_name: str = 'AntNest.ItemEmailPipeline', tls: bool = False, starttls: bool = False):
         super().__init__()
         self.account = account
         self.password = password
@@ -271,7 +361,7 @@ class ItemBaseEmailPipeline(Pipeline):
         await smtp.login(self.account, self.password)
         return smtp
 
-    async def send(self, smtp: aiosmtplib.SMTP, title: str, content: str, attachments: Optional[List[IO]]=None):
+    async def send(self, smtp: aiosmtplib.SMTP, title: str, content: str, attachments: Optional[List[IO]] = None):
         if attachments is None:
             msg = MIMEText(content)
         else:
@@ -305,8 +395,8 @@ class ItemEmailPipeline(ItemBaseEmailPipeline):
 
 
 class ItemBaseRedisPipeline(Pipeline):
-    def __init__(self, address: str, db: Optional[int]=None, password: Optional[str]=None, encoding: str='utf-8',
-                 minsize: int=1, maxsize: int=10, ssl: Optional[bool]=None, timeout: Optional[float]=None):
+    def __init__(self, address: str, db: Optional[int] = None, password: Optional[str] = None, encoding: str = 'utf-8',
+                 minsize: int = 1, maxsize: int = 10, ssl: Optional[bool] = None, timeout: Optional[float] = None):
         super().__init__()
         self.address = address
         self.db = db
@@ -319,7 +409,7 @@ class ItemBaseRedisPipeline(Pipeline):
 
     async def create_redis(self) -> aioredis.ConnectionsPool:
         return await aioredis.create_redis_pool(
-            self.address, db=self.db, password=self.password,encoding=self.encoding, minsize=self.minsize,
+            self.address, db=self.db, password=self.password, encoding=self.encoding, minsize=self.minsize,
             maxsize=self.maxsize, ssl=self.ssl, timeout=self.timeout)
 
 
