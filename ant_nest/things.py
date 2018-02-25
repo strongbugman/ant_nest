@@ -124,7 +124,7 @@ class BytesField(IntField):
 
 
 # store all item class`s field reference
-_fields = defaultdict(dict)  # type: DefaultDict['Item', Dict[str, IntField]]
+_fields = defaultdict(dict)  # type: DefaultDict[Type['Item'], Dict[str, IntField]]
 
 
 class ItemMeta(abc.ABCMeta):

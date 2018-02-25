@@ -14,7 +14,7 @@ async def test_pipeline():
     await pl.process(Request('GET', URL('https://test.com')))
 
 
-def test_response_fileter_error_pipeline():
+def test_response_filter_error_pipeline():
     pl = ResponseFilterErrorPipeline()
     res = Response('GET', URL('https://test.com'))
     err_res = Response('GET', URL('https://test.com'))
