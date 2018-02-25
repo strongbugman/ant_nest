@@ -12,6 +12,7 @@ import re
 import aiomysql
 import aioredis
 import aiosmtplib
+import aiofile
 
 from .things import Things, Response, Request, Item
 from .exceptions import FieldValidationError, ThingDropped
@@ -191,17 +192,15 @@ class ItemFieldReplacePipeline(Pipeline):
         return thing
 
 
-class ItemBaseJsonDumpPipeline(Pipeline):
+class ItemBaseFileDumpPipeline(Pipeline):
     @staticmethod
-    def _dump(file_path: str, data: Dict) -> None:
-        with open(file_path, 'w') as f:
-            json.dump(data, f)
-
-    async def dump(self, file_path: str, data: Dict) -> None:
-        await asyncio.get_event_loop().run_in_executor(None, self._dump, file_path, data)
+    async def dump(file_path: str, data: bytes) -> None:
+        file = aiofile.AIOFile(file_path, 'w+')
+        await file.write(data)
+        await file.fsync()
 
 
-class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
+class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
     def __init__(self, file_dir: str = '.'):
         super().__init__()
         self.file_dir = file_dir
@@ -213,6 +212,7 @@ class ItemJsonDumpPipeline(ItemBaseJsonDumpPipeline):
 
     async def on_spider_close(self) -> None:
         for file_name, data in self.data.items():
+            data = json.dumps(data).encode()
             await self.dump(os.path.join(self.file_dir, file_name + '.json'), data)
 
 
