@@ -1,9 +1,11 @@
 import os
 import time
 from datetime import datetime
+import io
 
 import pytest
 from yarl import URL
+import aiofiles
 
 from ant_nest import *
 
@@ -64,6 +66,19 @@ def test_item_filed_replace_pipeline():
     item.info = 'hi\n,\t\r ant\n'
     pl.process(item)
     assert item.info == 'hi, ant'
+
+
+@pytest.mark.asyncio
+async def test_item_base_file_dump_pipeline():
+    pl = ItemBaseFileDumpPipeline()
+    await pl.dump('/dev/null', 'Hello World')
+    await pl.dump('/dev/null', b'Hello World')
+    await pl.dump('/dev/null', io.StringIO('Hello World'))
+    await pl.dump('/dev/null', io.BytesIO(b'Hello World'))
+    await pl.dump('/dev/null', open('./tests/test.html'))
+
+    with pytest.raises(ValueError):
+        await pl.dump('/dev/null', None)
 
 
 @pytest.mark.asyncio

@@ -5,14 +5,14 @@ from setuptools import setup, find_packages
 requires = ['aiohttp>=2.3.2, <3.0', 'lxml>=3.7.0',
             'aiomysql>=0.0.11', 'PyMySQL>=0.7.11', 'aioredis>=1.0.0',
             'jpath>=1.5', 'aiosmtplib>=1.0.2', 'tenacity>=4.8.0', 'simplejson>=3.5.0', 'aiosocks>=0.2.6',
-            'aiofile>=0.5.3']
+            'aiofiles>=0.3.1']
 tests_require = ['pytest>=3.3.1', 'pytest-asyncio>=0.8.0', 'pytest-cov>=2.5.1']
 setup_require = ['pytest-runner>=3.0']
 
 
 setup(
     name="ant_nest",
-    version="0.30.3",
+    version="0.30.4",
     url='https://github.com/strongbugman/ant_nest',
     description='A simple and clear Web Crawler framework build on python3.6+ with async',
     long_description=open('README.rst').read(),
