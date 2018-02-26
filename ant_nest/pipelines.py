@@ -1,18 +1,17 @@
-from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union, Sequence
+from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union, Sequence, Coroutine, AnyStr
 import logging
 from collections import defaultdict
 import json
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import asyncio
 import random
 import re
 
 import aiomysql
 import aioredis
 import aiosmtplib
-import aiofile
+import aiofiles
 
 from .things import Things, Response, Request, Item
 from .exceptions import FieldValidationError, ThingDropped
@@ -193,14 +192,61 @@ class ItemFieldReplacePipeline(Pipeline):
 
 
 class ItemBaseFileDumpPipeline(Pipeline):
+    streaming_buffer_size = 1024 * 1024  # default is 1MB
+
     @staticmethod
-    async def dump(file_path: str, data: bytes) -> None:
-        file = aiofile.AIOFile(file_path, 'w+')
-        await file.write(data)
-        await file.fsync()
+    async def _handle_data(data: Union[Coroutine, AnyStr]) -> AnyStr:
+        """Handle data read and avoid being blocked with big size"""
+        if isinstance(data, Coroutine):
+            data = await data
+
+        return data
+
+    @classmethod
+    async def dump(cls, file_path: str, data: Union[AnyStr, IO]) -> None:
+        """Dump data(binary or text, stream or normal, async or not) to disk file.
+        IO data will be closed.
+        """
+        chunk = None  # type: Optional[Union[AnyStr]]
+        if isinstance(data, str):
+            file_mode = 'w'
+        elif isinstance(data, bytes):
+            file_mode = 'wb'
+        elif hasattr(data, 'read'):  # readable
+            chunk = data.read(cls.streaming_buffer_size)
+            if isinstance(chunk, Coroutine):
+                chunk = await chunk
+
+            if isinstance(chunk, str):
+                file_mode = 'w'
+            else:
+                file_mode = 'wb'
+        else:
+            raise ValueError('The type {:s} is not supported'.format(type(data).__class__.__name__))
+
+        async with aiofiles.open(file_path, file_mode) as file:
+            if chunk is not None:  # in streaming
+                await file.write(chunk)
+                while True:
+
+                    chunk = data.read(cls.streaming_buffer_size)
+                    if isinstance(chunk, Coroutine):
+                        chunk = await chunk
+
+                    if len(chunk) == 0:
+                        break
+                    else:
+                        await file.write(chunk)
+
+                result = data.close()
+                if isinstance(result, Coroutine):
+                    await result
+            else:
+                await file.write(data)
 
 
 class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
+    """Dump item to json during pipeline closing"""
     def __init__(self, file_dir: str = '.'):
         super().__init__()
         self.file_dir = file_dir
@@ -212,7 +258,7 @@ class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
 
     async def on_spider_close(self) -> None:
         for file_name, data in self.data.items():
-            data = json.dumps(data).encode()
+            data = json.dumps(data)
             await self.dump(os.path.join(self.file_dir, file_name + '.json'), data)
 
 
