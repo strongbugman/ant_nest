@@ -1,4 +1,5 @@
 from typing import Optional, List, Coroutine, Union, Dict, Callable, AnyStr, IO, DefaultDict
+import asyncio
 import abc
 import itertools
 import logging
@@ -82,7 +83,7 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(self.item_pipelines, self.response_pipelines, self.request_pipelines):
             try:
                 obj = pipeline.on_spider_open()
-                if isinstance(obj, Coroutine):
+                if asyncio.iscoroutine(obj):
                     await obj
             except Exception as e:
                 self.logger.exception('Open pipelines with ' + e.__class__.__name__)
@@ -91,7 +92,7 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(self.item_pipelines, self.response_pipelines, self.request_pipelines):
             try:
                 obj = pipeline.on_spider_close()
-                if isinstance(obj, Coroutine):
+                if asyncio.iscoroutine(obj):
                     await obj
             except Exception as e:
                 self.logger.exception('Close pipelines with ' + e.__class__.__name__)
@@ -149,7 +150,7 @@ class Ant(abc.ABC):
         for pipeline in pipelines:
             try:
                 thing = pipeline.process(thing)
-                if isinstance(thing, Coroutine):
+                if asyncio.iscoroutine(thing):
                     with async_timeout.timeout(timeout):
                         thing = await thing
             except Exception as e:

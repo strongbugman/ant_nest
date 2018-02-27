@@ -76,6 +76,10 @@ async def test_item_base_file_dump_pipeline():
     await pl.dump('/dev/null', io.StringIO('Hello World'))
     await pl.dump('/dev/null', io.BytesIO(b'Hello World'))
     await pl.dump('/dev/null', open('./tests/test.html'))
+    async with aiofiles.open('./tests/test.html') as f:
+        await pl.dump('/dev/null', f)
+    async with aiofiles.open('./tests/test.html', 'rb') as f:
+        await pl.dump('/dev/null', f)
 
     with pytest.raises(ValueError):
         await pl.dump('/dev/null', None)

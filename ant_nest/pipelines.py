@@ -1,4 +1,5 @@
 from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union, Sequence, Coroutine, AnyStr
+import asyncio
 import logging
 from collections import defaultdict
 import json
@@ -194,14 +195,6 @@ class ItemFieldReplacePipeline(Pipeline):
 class ItemBaseFileDumpPipeline(Pipeline):
     streaming_buffer_size = 1024 * 1024  # default is 1MB
 
-    @staticmethod
-    async def _handle_data(data: Union[Coroutine, AnyStr]) -> AnyStr:
-        """Handle data read and avoid being blocked with big size"""
-        if isinstance(data, Coroutine):
-            data = await data
-
-        return data
-
     @classmethod
     async def dump(cls, file_path: str, data: Union[AnyStr, IO]) -> None:
         """Dump data(binary or text, stream or normal, async or not) to disk file.
@@ -214,7 +207,7 @@ class ItemBaseFileDumpPipeline(Pipeline):
             file_mode = 'wb'
         elif hasattr(data, 'read'):  # readable
             chunk = data.read(cls.streaming_buffer_size)
-            if isinstance(chunk, Coroutine):
+            if asyncio.iscoroutine(chunk):
                 chunk = await chunk
 
             if isinstance(chunk, str):
@@ -230,7 +223,7 @@ class ItemBaseFileDumpPipeline(Pipeline):
                 while True:
 
                     chunk = data.read(cls.streaming_buffer_size)
-                    if isinstance(chunk, Coroutine):
+                    if asyncio.iscoroutine(chunk):
                         chunk = await chunk
 
                     if len(chunk) == 0:
@@ -239,7 +232,7 @@ class ItemBaseFileDumpPipeline(Pipeline):
                         await file.write(chunk)
 
                 result = data.close()
-                if isinstance(result, Coroutine):
+                if asyncio.iscoroutine(result):
                     await result
             else:
                 await file.write(data)
