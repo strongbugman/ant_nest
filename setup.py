@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 from setuptools import setup, find_packages
+import re
 
-from ant_nest import __version__
 
-
-version = __version__
+with open('ant_nest/__init__.py', 'rt', encoding='utf8') as f:
+    version = re.search(r'__version__ = \'(.*?)\'', f.read()).group(1)
 
 
 requires = ['aiohttp>=2.3.2, <3.0', 'lxml>=3.7.0',
