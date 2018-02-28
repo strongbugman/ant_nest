@@ -13,7 +13,7 @@ import tempfile
 
 from .ant import Ant
 from .things import Response
-from . import queen
+from . import __version__
 
 
 __all__ = ['get_ants', 'run_ant', 'open_response_in_browser']
@@ -46,7 +46,6 @@ def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
 
 
 async def run_ant(ant_cls: Type[Ant]):
-    queen.init_loop(loop=asyncio.get_event_loop())
     ant = ant_cls()
     await ant.main()
 
@@ -63,8 +62,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--ant', help='ant name')
     parser.add_argument('-l', '--list', help='list ants', action='store_true')
+    parser.add_argument('-v', '--version', help='get package version', action='store_true')
     args = parser.parse_args()
     sys.path.append(os.getcwd())
+
+    if args.version:
+        print(__version__)
+        exit()
+
     try:
         import settings
     except ImportError as e:
@@ -74,7 +79,7 @@ def main():
     try:
         ants = get_ants(settings.ANT_PACKAGES)
     except Exception as e:
-        print('There is problem when finding and loading ants:')
+        print('There is a problem with finding and loading ants:')
         print(format_exc())
         exit(-1)
     if args.list:

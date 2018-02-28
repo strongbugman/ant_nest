@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 from setuptools import setup, find_packages
 
+from ant_nest import __version__
+
+
+version = __version__
+
 
 requires = ['aiohttp>=2.3.2, <3.0', 'lxml>=3.7.0',
             'aiomysql>=0.0.11', 'PyMySQL>=0.7.11', 'aioredis>=1.0.0',
@@ -12,7 +17,7 @@ setup_require = ['pytest-runner>=3.0']
 
 setup(
     name="ant_nest",
-    version="0.30.5",
+    version=version,
     url='https://github.com/strongbugman/ant_nest',
     description='A simple and clear Web Crawler framework build on python3.6+ with async',
     long_description=open('README.rst').read(),

@@ -23,8 +23,3 @@ install:
 script: python setup.py test --addopts='--cov=.'
 after_success:
 - codecov
-deploy:
-  provider: pypi
-  user: bugboy
-  password:
-    secure: NP/e3XOuUfigwcmcNAXPIXlU2iS1b9mHK9KRnqRW9r+5y+OMv81yuQj9SH9yMp26CDg0osWLOy7y3tOtUdKXjAbcME6i1G910CQ26Jh7U2zS3GcsIzpeHagAZRv+xq+niwn7pMswI/z7nvy3BI7x5qK5qDUsbneVBuTuCN51X5yL/ksGBqMSbum1XmkV/LBbvrPQK2V6QXnNhMgPEUBT/l7UWLGiRHbzY5rMDP3yZN/nxdgzWSDhRxfRnRvOWDRg0GTeMzf450dR3FwR1po3QmUxHP1Ds+ffGPeMjEmhncyF2FaEg/rOGJeRiyzM63aWZzW4e+UV5Z4rzBb7efJRye6Czw+LRxYCl8S6G9PpZ7SGNMxvSadMmV79098qhTMtU46r29RMWQwKKGtnjBKwcf57p8ZYmUGQL+x1brXFzaVpGbN/b6OLtVY071INHhLaO5dZG2JYruaEmg6DkU8Zug4l0ZX7UcERbpxOTA+C1l3Lz/eXT62RmYwNg4ftP7vWxyuK/fVlRWf7Yad1lwYmtA7fF+J+NB9T08ETl71/KnlgeIrNZrYJIp3GF5mt7dmBPl5JrkMql4YOxnaUL3R4LHbPlz/GbuUqMWybnC/MTVvtRfP2C52BPdYFnwxBCFl3Aii+eTOlfZOk5zWcdhSS5A9FmSQ9GbR2QyGQ4O8FXss=
