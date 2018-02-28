@@ -28,8 +28,7 @@ Features
 
 * Things(request, response and item) can though pipelines(in async or not)
 * Item and item extractor,  it`s easy to define and extract(by xpath, jpath or regex) a validated(by field type) item
-* Custom "ensure_future" and "as_completed" method provide concurrent limit and collection of completed coroutines
-* Default coroutines concurrent limit, reduce memory usage
+* Custom "ensure_future" and "as_completed" api provide a easy work flow
 
 Install
 =======
@@ -90,9 +89,9 @@ Let`s take a look, create book.py first::
             urls = response.html_element.xpath('//a[@class="single_book"]/@href')
             # run "crawl_book" coroutines in concurrent
             for url in urls:
-                # "queen.schedule_coroutine" is a function like "ensure_future" in "asyncio",
+                # "pool.schedule_coroutine" is a function like "ensure_future" in "asyncio",
                 # but it provide something else
-                queen.schedule_coroutine(self.crawl_book(url))
+                self.pool.schedule_coroutine(self.crawl_book(url), timeout=5)
 
 Create a settings.py::
 
@@ -114,16 +113,16 @@ Defect
 one coroutine`s exception will break await chain especially in a loop unless we handle it by
 hand. eg::
 
-    for cor in queen.as_completed((self.crawl(url) for url in self.urls)):
+    for cor in self.pool.as_completed((self.crawl(url) for url in self.urls)):
         try:
             await cor
         except Exception:  # may raise many exception in a await chain
             pass
 
-but we can use "queen.as_completed_with_async", eg::
+but we can use "queen.as_completed_with_async" now, eg::
 
-    async fo result in queen.as_completed_with_async(self.crawl(url) for ufl in self.urls):
-        # exception in "self.crawl(url)" will be pass automatic
+    async fo result in self.pool.as_completed_with_async(self.crawl(url) for ufl in self.urls):
+        # exception in "self.crawl(url)" will be passed and logged automatic
         self.handle(result)
 
 * High memory usage

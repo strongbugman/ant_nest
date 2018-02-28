@@ -1,4 +1,4 @@
-from typing import Optional, List, Coroutine, Union, Dict, Callable, AnyStr, IO, DefaultDict
+from typing import Optional, List, Union, Dict, Callable, AnyStr, IO, DefaultDict
 import asyncio
 import abc
 import itertools
@@ -21,7 +21,7 @@ from aiosocks import Socks4Auth, Socks5Auth
 
 from .pipelines import Pipeline
 from .things import Request, Response, Item, Things
-from . import queen
+from .coroutine_pool import CoroutinesPool, timeout_wrapper
 from .exceptions import ThingDropped
 
 
@@ -41,6 +41,9 @@ class Ant(abc.ABC):
     response_in_stream = False
     connection_limit = 100  # see "TCPConnector" in "aiohttp"
     connection_limit_per_host = 0
+    pool_limit = 100
+    pool_timeout = DEFAULT_TIMEOUT
+    pool_raise_exception = False
 
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -51,6 +54,8 @@ class Ant(abc.ABC):
         self._last_time = self._start_time
         self._report_slot = 60  # report once after one minute by default
         self._session = self.make_session()
+        self.pool = CoroutinesPool(limit=self.pool_limit, timeout=self.pool_timeout,
+                                   raise_exception=self.pool_raise_exception)
 
     async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None,
                       headers: Optional[dict]=None, cookies: Optional[dict]=None,
@@ -62,7 +67,7 @@ class Ant(abc.ABC):
         req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=self.request_timeout)
         self.report(req)
 
-        request_function = queen.timeout_wrapper(self._request, timeout=self.request_timeout)
+        request_function = timeout_wrapper(self._request, timeout=self.request_timeout)
         retries = self.request_retries
         if retries > 0:
             res = await self.make_retry_decorator(retries, self.request_retry_delay)(request_function)(req)
@@ -98,6 +103,7 @@ class Ant(abc.ABC):
                 self.logger.exception('Close pipelines with ' + e.__class__.__name__)
 
         await self._session.close()
+        await self.pool.close()
 
         self.logger.info('Closed')
 
@@ -111,10 +117,9 @@ class Ant(abc.ABC):
             await self.run()
         except Exception as e:
             self.logger.exception('Run ant run`s coroutine with ' + e.__class__.__name__)
-        # wait scheduled coroutines before wait "close" method
-        await queen.wait_scheduled_coroutines()
+        # wait scheduled coroutines before "self.close" coroutine running
+        await self.pool.wait_scheduled_coroutines()
         await self.close()
-        await queen.wait_scheduled_coroutines()
         # total report
         for name, counts in self._reports.items():
             self.logger.info('Get {:d} {:s} in total'.format(counts[1], name))

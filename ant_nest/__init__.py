@@ -1,11 +1,13 @@
 from typing import Any
 
 from .ant import *
-from .cli import *
 from .things import *
 from .pipelines import *
-from . import queen
+from .coroutine_pool import *
 from .exceptions import *
+
+
+__version__ = '0.31.0'
 
 
 def extract_value(_type: str, path: str, data: Any, extract_type: str=ItemExtractor.extract_with_take_first,
@@ -43,5 +45,5 @@ class CliAnt(Ant):
         pass
 
 
-__all__ = ['queen'] + ant.__all__ + cli.__all__ + pipelines.__all__ + exceptions.__all__ +\
+__all__ = ant.__all__ + pipelines.__all__ + exceptions.__all__ + coroutine_pool.__all__ + \
           things.__all__ + ['extract_value_by_jpath', 'extract_value_by_regex', 'extract_value_by_xpath']
