@@ -4,6 +4,7 @@ from yarl import URL
 import pytest
 
 from ant_nest import *
+from ant_nest.cli import *
 
 
 def test_request():
