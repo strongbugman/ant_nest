@@ -26,7 +26,7 @@ def test_response():
     with pytest.raises(ValueError):
         res.get_text()
     res._content = b'1'
-    res._get_encoding = lambda: 'utf-8'
+    res.get_encoding = lambda: 'utf-8'
     assert res.get_text() == '1'
 
 
