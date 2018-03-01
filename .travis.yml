@@ -20,6 +20,6 @@ before_install:
 - docker run -d --name delegate -p 1081:1080 vimagick/delegated -P1080 SERVER=socks
 install:
 - pip install codecov
-script: python setup.py test --addopts='--cov=.'
+script: make test
 after_success:
 - codecov
