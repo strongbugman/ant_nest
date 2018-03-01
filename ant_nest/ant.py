@@ -16,7 +16,6 @@ from tenacity import retry
 from tenacity.retry import retry_if_result, retry_if_exception_type
 from tenacity.wait import wait_fixed
 from tenacity.stop import stop_after_attempt
-from aiosocks.connector import ProxyConnector
 from aiosocks import Socks4Auth, Socks5Auth
 
 from .pipelines import Pipeline
@@ -136,8 +135,9 @@ class Ant(abc.ABC):
     def make_session(self) -> ClientSession:
         """Create aiohttp`s ClientSession"""
         return ClientSession(response_class=Response, request_class=Request,
-                             connector=ProxyConnector(limit=self.connection_limit, enable_cleanup_closed=True,
-                                                      limit_per_host=self.connection_limit_per_host))
+                             connector=aiohttp.TCPConnector(limit=self.connection_limit, enable_cleanup_closed=True,
+                                                            limit_per_host=self.connection_limit_per_host)
+                             )
 
     def get_proxy(self) -> Optional[URL]:
         """Chose a proxy, default by random"""

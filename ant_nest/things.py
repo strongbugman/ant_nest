@@ -6,8 +6,7 @@ from collections import defaultdict
 import logging
 import re
 
-from aiohttp import ClientResponse
-from aiosocks.connector import ProxyClientRequest
+from aiohttp import ClientResponse, ClientRequest
 from lxml import html
 import jpath
 import simplejson
@@ -15,7 +14,7 @@ import simplejson
 from .exceptions import FieldValidationError, ItemExtractError
 
 
-class Request(ProxyClientRequest):
+class Request(ClientRequest):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # store data obj
@@ -34,7 +33,7 @@ class Response(ClientResponse):
             raise ValueError('Read stream first')
         if self._text is None:
             if encoding is None:
-                encoding = self._get_encoding()
+                encoding = self.get_encoding()
             self._text = self._content.decode(encoding, errors=errors)
         return self._text
 
