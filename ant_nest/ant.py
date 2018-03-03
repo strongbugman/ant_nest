@@ -30,6 +30,8 @@ class Ant(abc.ABC):
     response_pipelines = []  # type: List[Pipeline]
     request_pipelines = []  # type: List[Pipeline]
     item_pipelines = []  # type: List[Pipeline]
+    request_cls = Request
+    response_cls = Response
     request_timeout = DEFAULT_TIMEOUT
     request_retries = 3
     request_retry_delay = 5
@@ -61,7 +63,7 @@ class Ant(abc.ABC):
                       ) -> Response:
         if not isinstance(url, URL):
             url = URL(url)
-        req = Request(method, url, params=params, headers=headers, cookies=cookies, data=data)
+        req = self.request_cls(method, url, params=params, headers=headers, cookies=cookies, data=data)
         req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=self.request_timeout)
         self.report(req)
 
@@ -133,10 +135,11 @@ class Ant(abc.ABC):
 
     def make_session(self) -> ClientSession:
         """Create aiohttp`s ClientSession"""
-        return ClientSession(response_class=Response, request_class=Request,
-                             connector=aiohttp.TCPConnector(limit=self.connection_limit, enable_cleanup_closed=True,
-                                                            limit_per_host=self.connection_limit_per_host)
-                             )
+        return ClientSession(
+            response_class=self.response_cls, request_class=self.request_cls,
+            connector=aiohttp.TCPConnector(limit=self.connection_limit, enable_cleanup_closed=True,
+                                           limit_per_host=self.connection_limit_per_host)
+        )
 
     def get_proxy(self) -> Optional[URL]:
         """Chose a proxy, default by random"""
@@ -175,10 +178,6 @@ class Ant(abc.ABC):
         if proxy is not None:
             if proxy.scheme == 'http' and proxy.user is not None:
                 kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = aiohttp.BasicAuth.from_url(proxy).encode()
-            elif proxy.scheme == 'socks5' and proxy.user is not None:
-                kwargs['proxy_auth'] = Socks5Auth(proxy.user, password=proxy.password)
-            elif proxy.scheme == 'socks4' and proxy.user is not None:
-                kwargs['proxy_auth'] = Socks4Auth(proxy.user)
 
         response = await self._session._request(**kwargs)
         if not self.response_in_stream:
