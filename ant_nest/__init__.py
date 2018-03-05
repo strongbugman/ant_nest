@@ -7,7 +7,7 @@ from .coroutine_pool import *
 from .exceptions import *
 
 
-__version__ = '0.31.0'
+__version__ = '0.32.0'
 
 
 def extract_value(_type: str, path: str, data: Any, extract_type: str=ItemExtractor.extract_with_take_first,
