@@ -3,6 +3,8 @@ python:
 - '3.6'
 services:
 - docker
+env:
+- TEST_HOT=TRAVIS
 before_install:
 - sudo /etc/init.d/mysql stop
 -  make prepare_test_env

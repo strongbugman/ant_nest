@@ -3,10 +3,6 @@ all: test
 version=`python -c 'import ant_nest; print(ant_nest.__version__)'`
 
 prepare_test_env:
-	docker pull redis
-	docker pull mariadb
-	docker pull kennethreitz/httpbin
-	docker pull sameersbn/squid
 	docker run --name test_redis --rm -d -p 6379:6379 redis
 	docker run --name test_mariadb --rm -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=letmein mariadb
 	docker run --name test_httpbin --rm -d -p 8080:8080 kennethreitz/httpbin
