@@ -4,7 +4,7 @@ python:
 services:
 - docker
 env:
-- TEST_HOT=TRAVIS
+- TEST_HOST=TRAVIS
 before_install:
 - sudo /etc/init.d/mysql stop
 -  make prepare_test_env
