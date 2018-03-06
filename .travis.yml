@@ -4,6 +4,7 @@ python:
 services:
 - docker
 before_install:
+- sudo /etc/init.d/mysql stop
 -  make prepare_test_env
 install:
 - pip install codecov
