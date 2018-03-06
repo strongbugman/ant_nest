@@ -226,20 +226,14 @@ async def test_with_real_request():
     assert res.status == 302
     assert ant._reports['Request'][1] > 12
     # with http proxy
-    proxy = os.getenv('TEST_HTTP_PROXY', 'http://localhost:3128')
+    proxy = os.getenv('TEST_HTTP_PROXY', 'http://bugman:letmein@localhost:3128')
     ant.request_proxies.append(proxy)
-    res = await ant.request('http://httpbin.org/anything')
+    res = await ant.request('https://httpbin.org/anything')
     assert res.status == 200
-    # with socks5 proxy
-    # proxy = os.getenv('TEST_SOCKS5_PROXY', 'socks5://localhost:1081')
-    # ant.request_proxies.pop()
-    # ant.request_proxies.append(proxy)
-    # res = await ant.request('http://httpbin.org/anything')
-    # assert res.status == 200
     # with stream
     ant.request_proxies.pop()
     ant.response_in_stream = True
-    res = await ant.request('http://httpbin.org/anything')
+    res = await ant.request(httpbin_base_url + 'anything')
     assert res.status == 200
     with pytest.raises(ValueError):
         res.simple_text

@@ -2,24 +2,12 @@ language: python
 python:
 - '3.6'
 services:
-- mysql
 - docker
-env:
-- TEST_HOST=TRAVIS TEST_MYSQL_SERVER="127.0.0.1" TEST_MYSQL_PORT=3306 TEST_MYSQL_USER=travis
-  TEST_MYSQL_PASSWORD="" TEST_MYSQL_DATABASE=test
 before_install:
-- mysql -e 'DROP DATABASE IF EXISTS test;'
-- mysql -e 'CREATE DATABASE test;'
-- docker pull kennethreitz/httpbin
-- docker pull dannydirect/tinyproxy
-- docker pull vimagick/delegated
-- docker pull redis
-- docker run -d -p 6379:6379 redis
-- docker run -d -p 8080:8080 kennethreitz/httpbin
-- docker run -d -p 3128:8888 dannydirect/tinyproxy ANY
-- docker run -d --name delegate -p 1081:1080 vimagick/delegated -P1080 SERVER=socks
+-  make prepare_test_env
 install:
 - pip install codecov
 script: make test
 after_success:
+- make destroy_test_env
 - codecov
