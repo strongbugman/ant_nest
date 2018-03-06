@@ -156,12 +156,13 @@ async def test_item_mysql_pipeline():
     mysql_port = int(os.getenv('TEST_MYSQL_PORT', 3306))
     mysql_user = os.getenv('TEST_MYSQL_USER', 'root')
     mysql_password = os.getenv('TEST_MYSQL_PASSWORD', 'letmein')
-    mysql_database = os.getenv('TEST_MYSQL_DATABASE)', 'test')
 
     bpl = ItemBaseMysqlPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
-                                database=mysql_database, table='test')
+                                database='mysql', table='')
     pool = await bpl.create_pool()
-    await bpl.push_data('''CREATE TABLE `test` (
+    await bpl.push_data('''DROP DATABASE IF EXISTS test;
+                           CREATE DATABASE test;''', pool)
+    await bpl.push_data('''CREATE TABLE test.test (
                            `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
                            `test` TEXT DEFAULT NULL,
                            `test_bool` BOOL DEFAULT NULL,
@@ -175,14 +176,14 @@ async def test_item_mysql_pipeline():
     test_item = Item(test='I ant', test_bool=False, test_int=1, test_float=0.3, test_bytes=b'\xf0\x9f\x91\x8d',
                      test_datetime=datetime.now())
     ibpl = ItemMysqlInsertPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
-                                   database=mysql_database, table='test')
+                                   database='test', table='test')
     await ibpl.on_spider_open()
     assert test_item is await ibpl.process(test_item)
     data = await ibpl.pull_data('SELECT * FROM test', ibpl.pool)
     assert test_item.test == data[0]['test']
 
     ubpl = ItemMysqlUpdatePipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
-                                   database=mysql_database, table='test', primary_key='id')
+                                   database='test', table='test', primary_key='id')
     await ubpl.on_spider_open()
     test_item.id = data[0]['id']
     test_item.test = 'I ANT'
@@ -197,7 +198,7 @@ async def test_item_mysql_pipeline():
     iubpl = ItemMysqlInsertUpdatePipeline(
         ['test'],
         host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
-        database=mysql_database, table='test')
+        database='test', table='test')
     await iubpl.on_spider_open()
     test_item.test = 'I love ant!'
     assert test_item is await iubpl.process(test_item)
@@ -207,7 +208,7 @@ async def test_item_mysql_pipeline():
     await ubpl.on_spider_close()
     await ibpl.on_spider_close()
     await iubpl.on_spider_close()
-    await bpl.push_data('DROP TABLE test;', pool)
+    await bpl.push_data('DROP TABLE test.test;DROP DATABASE test', pool)
     pool.close()
     await pool.wait_closed()
 
