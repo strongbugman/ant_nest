@@ -53,7 +53,7 @@ class Ant(abc.ABC):
         self._start_time = time.time()
         self._last_time = self._start_time
         self._report_slot = 60  # report once after one minute by default
-        self._session = self.make_session()
+        self._session = self.make_session()  # type: aiohttp.ClientSession
         self.pool = CoroutinesPool(limit=self.pool_limit, timeout=self.pool_timeout,
                                    raise_exception=self.pool_raise_exception)
 
@@ -174,7 +174,7 @@ class Ant(abc.ABC):
         kwargs['max_redirects'] = self.request_max_redirects
         kwargs['allow_redirects'] = self.request_allow_redirects
 
-        # proxy auth not work when one session with many requests, add auth header to fix it
+        # proxy auth not work in one session with many requests, add auth header to fix it
         if proxy is not None:
             if proxy.scheme == 'http' and proxy.user is not None:
                 kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = aiohttp.BasicAuth.from_url(proxy).encode()
