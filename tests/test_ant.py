@@ -228,12 +228,12 @@ async def test_with_real_request():
     # with http proxy
     proxy = os.getenv('TEST_HTTP_PROXY', 'http://bugman:letmein@localhost:3128')
     ant.request_proxies.append(proxy)
-    res = await ant.request('https://httpbin.org/anything')
+    res = await ant.request('http://httpbin.org/anything')
     assert res.status == 200
     # with stream
     ant.request_proxies.pop()
     ant.response_in_stream = True
-    res = await ant.request(httpbin_base_url + 'anything')
+    res = await ant.request('http://httpbin.org/anything')
     assert res.status == 200
     with pytest.raises(ValueError):
         res.simple_text
