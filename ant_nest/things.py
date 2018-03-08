@@ -2,7 +2,7 @@
 from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, DefaultDict, AnyStr, IO, Callable, Generator
 from collections.abc import MutableMapping
 import abc
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import logging
 import re
 
@@ -14,11 +14,24 @@ import simplejson
 from .exceptions import FieldValidationError, ItemExtractError
 
 
+ConnectionKey = namedtuple('ConnectionKey', ['host', 'port', 'ssl', 'proxy_host', 'proxy_port'])
+
+
 class Request(ClientRequest):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # store data obj
         self.data = kwargs.get('data', None)  # type: Union[AnyStr, dict, IO, None]
+
+    @property
+    def connection_key(self):
+        if self.proxy is not None:
+            proxy_host = self.proxy.host
+            proxy_port = self.proxy.port
+        else:
+            proxy_host = None
+            proxy_port = None
+        return ConnectionKey(self.host, self.port, self.is_ssl(), proxy_host, proxy_port)
 
 
 class Response(ClientResponse):
