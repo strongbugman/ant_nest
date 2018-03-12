@@ -202,14 +202,9 @@ def test_extract():
         extract_value_by_jpath('a', None, ignore_exception=False)
 
 
-class MAnt(Ant):
-    async def run(self):
-        pass
-
-
 def test_cli_get_ants():
     ants = get_ants(['tests'])
-    assert MAnt is list(ants.values())[0]
+    assert CliAnt is list(ants.values())[0]
 
 
 def test_cli_open_browser():
@@ -221,3 +216,16 @@ def test_cli_open_browser():
         return True
 
     assert open_response_in_browser(res, _open_browser_function=open_browser_function)
+
+
+def test_exception_filter():
+    class FakeRecord:
+        pass
+
+    fr = ExceptionFilter([ThingDropped])
+    rc = FakeRecord()
+    rc.exc_info = (ThingDropped, None, None)
+
+    assert not fr.filter(rc)
+    rc.exc_info = (OSError, None, None)
+    assert fr.filter(rc)
