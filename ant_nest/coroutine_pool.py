@@ -215,8 +215,8 @@ class CoroutinesPool:
                     self.logger.exception(e)
 
     async def close(self):
-        await self.wait_scheduled_coroutines()
         self._is_closed = True
+        await self.wait_scheduled_coroutines()
 
     def __repr__(self):
         return '{:s}({:s}) with {:d} running coroutines count'.format(

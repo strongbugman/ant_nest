@@ -10,6 +10,8 @@ from pkgutil import iter_modules
 from traceback import format_exc
 import webbrowser
 import tempfile
+import signal
+import functools
 
 from .ant import Ant
 from .things import Response
@@ -17,6 +19,9 @@ from . import __version__
 
 
 __all__ = ['get_ants', 'run_ant', 'open_response_in_browser']
+
+
+__signal_count = 0
 
 
 def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
@@ -45,9 +50,16 @@ def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
     return results
 
 
-async def run_ant(ant_cls: Type[Ant]):
-    ant = ant_cls()
+async def run_ant(ant: Ant):
     await ant.main()
+
+
+def shutdown_ant(ant: Ant):
+    global __signal_count
+    if __signal_count == 1:
+        sys.exit()
+    __signal_count += 1
+    ant.pool._is_closed = True
 
 
 def open_response_in_browser(response: Response, file_type: str='.html',
@@ -91,7 +103,12 @@ def main():
     elif args.ant is not None:
         ant_name = args.ant
         if ant_name in ants:
-            asyncio.get_event_loop().run_until_complete(run_ant(ants[ant_name]))
+            loop = asyncio.get_event_loop()
+            ant = ants[ant_name]()
+
+            loop.add_signal_handler(signal.SIGINT,
+                                    functools.partial(shutdown_ant, ant))
+            asyncio.get_event_loop().run_until_complete(run_ant(ant))
         else:
             print('Can not find ant by the name "{:s}"'.format(ant_name))
             exit(-1)
