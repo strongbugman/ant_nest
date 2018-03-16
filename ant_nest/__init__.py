@@ -7,7 +7,7 @@ from .utils import *
 from .utils import CliAnt
 
 
-__version__ = '0.32.0'
+__version__ = '0.33.0'
 
 
 __all__ = ant.__all__ + pipelines.__all__ + exceptions.__all__ + coroutine_pool.__all__ + \
