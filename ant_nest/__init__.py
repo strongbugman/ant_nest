@@ -4,6 +4,7 @@ from .pipelines import *
 from .coroutine_pool import *
 from .exceptions import *
 from .utils import *
+from .utils import CliAnt
 
 
 __version__ = '0.32.0'

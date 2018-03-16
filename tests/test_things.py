@@ -1,9 +1,11 @@
 import os
+import asyncio
 
 from yarl import URL
 import pytest
 
 from ant_nest import *
+from ant_nest import CliAnt
 from ant_nest.cli import *
 
 
@@ -203,8 +205,13 @@ def test_extract():
 
 
 def test_cli_get_ants():
-    ants = get_ants(['tests'])
+    ants = get_ants(['ant_nest'])
     assert CliAnt is list(ants.values())[0]
+
+
+def test_cli_run_ant():
+    ant = CliAnt()
+    asyncio.get_event_loop().run_until_complete(run_ant(ant))
 
 
 def test_cli_open_browser():

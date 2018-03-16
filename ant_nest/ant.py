@@ -57,13 +57,16 @@ class Ant(abc.ABC):
         self.pool = CoroutinesPool(limit=self.pool_limit, timeout=self.pool_timeout,
                                    raise_exception=self.pool_raise_exception)
 
-    async def request(self, url: Union[str, URL], method='GET', params: Optional[dict]=None,
-                      headers: Optional[dict]=None, cookies: Optional[dict]=None,
-                      data: Optional[Union[AnyStr, Dict, IO]]=None,
+    async def request(self, url: Union[str, URL], method='GET', params: Optional[dict] = None,
+                      headers: Optional[dict] = None, cookies: Optional[dict] = None,
+                      data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None
                       ) -> Response:
         if not isinstance(url, URL):
             url = URL(url)
-        req = self.request_cls(method, url, params=params, headers=headers, cookies=cookies, data=data)
+        if proxy and not isinstance(proxy, URL):
+            proxy = URL(proxy)
+
+        req = self.request_cls(method, url, params=params, headers=headers, cookies=cookies, data=data, proxy=proxy)
         req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=self.request_timeout)
         self.report(req)
 
@@ -167,7 +170,10 @@ class Ant(abc.ABC):
         return thing
 
     async def _request(self, req: Request) -> Response:
-        proxy = self.get_proxy()
+        if req.proxy is None:
+            proxy = self.get_proxy()
+        else:
+            proxy = req.proxy
         # cookies in headers, params in url
         kwargs = dict(method=req.method, url=req.url, headers=req.headers, data=req.data)
         kwargs['proxy'] = proxy

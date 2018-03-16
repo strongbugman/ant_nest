@@ -6,7 +6,7 @@ from .ant import Ant
 from .things import ItemExtractor
 
 
-__all__ = ['CliAnt', 'extract_value_by_xpath', 'extract_value_by_jpath', 'extract_value_by_regex', 'ExceptionFilter']
+__all__ = ['extract_value_by_xpath', 'extract_value_by_jpath', 'extract_value_by_regex', 'ExceptionFilter']
 
 
 class CliAnt(Ant):
