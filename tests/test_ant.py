@@ -230,8 +230,11 @@ async def test_with_real_request():
     ant.request_proxies.append(proxy)
     res = await ant.request('http://httpbin.org/anything')
     assert res.status == 200
-    # with stream
+
     ant.request_proxies.pop()
+    res = await ant.request('http://httpbin.org/anything', proxy=proxy)
+    assert res.status == 200
+    # with stream
     ant.response_in_stream = True
     res = await ant.request('http://httpbin.org/anything')
     assert res.status == 200
