@@ -12,6 +12,7 @@ import webbrowser
 import tempfile
 import signal
 import functools
+from asyncio.queues import QueueEmpty
 
 from .ant import Ant
 from .things import Response
@@ -59,7 +60,14 @@ def shutdown_ant(ant: Ant):
     if __signal_count == 1:
         sys.exit()
     __signal_count += 1
+
+    # drop waiting coroutines in coroutines pool
     ant.pool._is_closed = True
+    while True:
+        try:
+            ant.pool._queue.get_nowait()
+        except QueueEmpty:
+            break
 
 
 def open_response_in_browser(response: Response, file_type: str='.html',
