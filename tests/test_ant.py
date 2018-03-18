@@ -3,6 +3,7 @@ import os
 
 import pytest
 from tenacity import RetryError
+import asyncio
 
 from ant_nest import *
 
@@ -42,7 +43,6 @@ async def test_ant():
 
 @pytest.mark.asyncio
 async def test_ant_with_retry():
-    # with retry
     class Test2Ant(Ant):
         request_retries = 2
         request_retry_delay = 0.1
@@ -69,6 +69,14 @@ async def test_ant_with_retry():
     ant.request_retries = 1
     with pytest.raises(RetryError):
         await ant.request('https://www.test.com')
+    # with params
+    ant.retries = 0
+    ant.request_retries = 3
+    await ant.request('https://www.test.com')
+    ant.retries = 0
+    with pytest.raises(IOError):
+        await ant.request('https://www.test.com', retries=0)
+    # retry condition
 
     class Test3Ant(Test2Ant):
         async def _request(self, req: Request):
@@ -173,6 +181,9 @@ async def test_with_real_request():
         res = await ant.request(httpbin_base_url + 'anything', method=method)
         assert res.status == 200
         assert res.simple_json['method'] == method
+    # timeout
+    with pytest.raises(asyncio.TimeoutError):
+        await ant.request(httpbin_base_url, timeout=0.001, retries=0)
     # params
     res = await ant.request(httpbin_base_url + 'get?k1=v1&k2=v2')
     assert res.status == 200
