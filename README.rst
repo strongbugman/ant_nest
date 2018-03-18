@@ -59,18 +59,19 @@ Let`s take a look, create book.py first::
         # the things(request, response, item) will pass through pipelines in order, pipelines can change or drop them
         item_pipelines = [ItemValidatePipeline(),
                           ItemMysqlInsertPipeline(settings.MYSQL_HOST, settings.MYSQL_PORT, settings.MYSQL_USER,
-                                                  settings.MYSQL_PASSWORD, settings.MYSQL_DATABASE, 'book'),
-                          ReportPipeline()]
-        request_pipelines = [RequestDuplicateFilterPipeline(), RequestUserAgentPipeline(), ReportPipeline()]
-        response_pipelines = [ResponseFilterErrorPipeline(), ReportPipeline()]
+                                                  settings.MYSQL_PASSWORD, settings.MYSQL_DATABASE, 'book')]
+        request_pipelines = [RequestDuplicateFilterPipeline(), RequestUserAgentPipeline()]
+        response_pipelines = [ResponseFilterErrorPipeline()]
 
 
-        # define ItemExtractor to extract item field by xpath from response(html source code)
-        self.item_extractor = ItemExtractor(BookItem)
-        self.item_extractor.add_regex('name', 'name=(\w+);')
-        self.item_extractor.add_xpath('author', '/html/body/div[1]/div[@class="author"]/text()')
-        self.item_extractor.add_xpath('content', '/html/body/div[2]/div[2]/div[2]//text()',
-                                      ItemExtractor.join_all)
+        def __init__(self):
+            super().__init__()
+            # define ItemExtractor to extract item field by xpath(jpath or regex) from response(html source code)
+			self.item_extractor = ItemExtractor(BookItem)
+            self.item_extractor.add_regex('name', 'name=(\w+);')
+            self.item_extractor.add_xpath('author', '/html/body/div[1]/div[@class="author"]/text()')
+            self.item_extractor.add_xpath('content', '/html/body/div[2]/div[2]/div[2]//text()',
+										  ItemExtractor.join_all)
 
         # crawl book information
         async def crawl_book(self, url):
@@ -78,7 +79,7 @@ Let`s take a look, create book.py first::
             response = await self.request(url)
             # extract item from response
             item = self.item_extractor.extract(response)
-            item.origin_url = str(response.url)  # or item['origin_url'] = str(response.url)
+            item.origin_url = response.url  # or item['origin_url'] = response.url
             # wait "collect" coroutine, it will let item pass through "item_pipelines"
             await self.collect(item)
 
@@ -91,7 +92,7 @@ Let`s take a look, create book.py first::
             for url in urls:
                 # "pool.schedule_coroutine" is a function like "ensure_future" in "asyncio",
                 # but it provide something else
-                self.pool.schedule_coroutine(self.crawl_book(url), timeout=5)
+                self.pool.schedule_coroutine(self.crawl_book(url))
 
 Create a settings.py::
 
