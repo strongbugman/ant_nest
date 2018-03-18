@@ -59,25 +59,29 @@ class Ant(abc.ABC):
 
     async def request(self, url: Union[str, URL], method='GET', params: Optional[dict] = None,
                       headers: Optional[dict] = None, cookies: Optional[dict] = None,
-                      data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None
+                      data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None,
+                      timeout: Optional[Union[int, float]] = None, retries: Optional[int] = None
                       ) -> Response:
         if not isinstance(url, URL):
             url = URL(url)
         if proxy and not isinstance(proxy, URL):
             proxy = URL(proxy)
+        if timeout is None:
+            timeout = self.request_timeout
+        if retries is None:
+            retries = self.request_retries
 
         req = self.request_cls(method, url, params=params, headers=headers, cookies=cookies, data=data, proxy=proxy)
-        req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=self.request_timeout)
+        req = await self._handle_thing_with_pipelines(req, self.request_pipelines, timeout=timeout)
         self.report(req)
 
-        request_function = timeout_wrapper(self._request, timeout=self.request_timeout)
-        retries = self.request_retries
+        request_function = timeout_wrapper(self._request, timeout=timeout)
         if retries > 0:
             res = await self.make_retry_decorator(retries, self.request_retry_delay)(request_function)(req)
         else:
             res = await request_function(req)
 
-        res = await self._handle_thing_with_pipelines(res, self.response_pipelines, timeout=self.request_timeout)
+        res = await self._handle_thing_with_pipelines(res, self.response_pipelines, timeout=timeout)
         self.report(res)
         return res
 
@@ -153,13 +157,13 @@ class Ant(abc.ABC):
 
     async def _handle_thing_with_pipelines(self, thing: Things, pipelines: List[Pipeline],
                                            timeout=DEFAULT_TIMEOUT) -> Things:
-        """Process thing one by one, break the process chain when get "None" or exception
+        """Process thing one by one, break the process chain when get exception
         :raise ThingDropped"""
         self.logger.debug('Process thing: ' + str(thing))
         raw_thing = thing
         for pipeline in pipelines:
             try:
-                thing = pipeline.process(thing)
+                thing = pipeline.process(thing)  # TODO: timeout limit? See https://github.com/glenfant/stopit#id15
                 if asyncio.iscoroutine(thing):
                     with async_timeout.timeout(timeout):
                         thing = await thing
