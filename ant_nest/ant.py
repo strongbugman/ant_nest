@@ -57,7 +57,7 @@ class Ant(abc.ABC):
         self.pool = CoroutinesPool(limit=self.pool_limit, timeout=self.pool_timeout,
                                    raise_exception=self.pool_raise_exception)
 
-    async def request(self, url: Union[str, URL], method='GET', params: Optional[dict] = None,
+    async def request(self, url: Union[str, URL], method: str ='GET', params: Optional[dict] = None,
                       headers: Optional[dict] = None, cookies: Optional[dict] = None,
                       data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None,
                       timeout: Optional[Union[int, float]] = None, retries: Optional[int] = None
@@ -84,6 +84,54 @@ class Ant(abc.ABC):
         res = await self._handle_thing_with_pipelines(res, self.response_pipelines, timeout=timeout)
         self.report(res)
         return res
+
+    async def get(self, url: Union[str, URL], params: Optional[dict] = None,
+                  headers: Optional[dict] = None, cookies: Optional[dict] = None,
+                  data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None,
+                  timeout: Optional[Union[int, float]] = None, retries: Optional[int] = None) -> Response:
+        kwargs = locals()
+        kwargs.pop('self')
+        return await self.request(method='GET', **kwargs)
+
+    async def post(self, url: Union[str, URL], params: Optional[dict] = None,
+                   headers: Optional[dict] = None, cookies: Optional[dict] = None,
+                   data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None,
+                   timeout: Optional[Union[int, float]] = None, retries: Optional[int] = None) -> Response:
+        kwargs = locals()
+        kwargs.pop('self')
+        return await self.request(method='POST', **kwargs)
+
+    async def put(self, url: Union[str, URL], params: Optional[dict] = None,
+                  headers: Optional[dict] = None, cookies: Optional[dict] = None,
+                  data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None,
+                  timeout: Optional[Union[int, float]] = None, retries: Optional[int] = None) -> Response:
+        kwargs = locals()
+        kwargs.pop('self')
+        return await self.request(method='PUT', **kwargs)
+
+    async def patch(self, url: Union[str, URL], params: Optional[dict] = None,
+                    headers: Optional[dict] = None, cookies: Optional[dict] = None,
+                    data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None,
+                    timeout: Optional[Union[int, float]] = None, retries: Optional[int] = None) -> Response:
+        kwargs = locals()
+        kwargs.pop('self')
+        return await self.request(method='PATCH', **kwargs)
+
+    async def delete(self, url: Union[str, URL], params: Optional[dict] = None,
+                     headers: Optional[dict] = None, cookies: Optional[dict] = None,
+                     data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None,
+                     timeout: Optional[Union[int, float]] = None, retries: Optional[int] = None) -> Response:
+        kwargs = locals()
+        kwargs.pop('self')
+        return await self.request(method='DELETE', **kwargs)
+
+    async def head(self, url: Union[str, URL], params: Optional[dict] = None,
+                   headers: Optional[dict] = None, cookies: Optional[dict] = None,
+                   data: Optional[Union[AnyStr, Dict, IO]] = None, proxy: Optional[Union[str, URL]] = None,
+                   timeout: Optional[Union[int, float]] = None, retries: Optional[int] = None) -> Response:
+        kwargs = locals()
+        kwargs.pop('self')
+        return await self.request(method='HEAD', **kwargs)
 
     async def collect(self, item: Item) -> None:
         self.logger.debug('Collect item: ' + str(item))

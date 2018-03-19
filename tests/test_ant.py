@@ -76,6 +76,8 @@ async def test_ant_with_retry():
     ant.retries = 0
     with pytest.raises(IOError):
         await ant.request('https://www.test.com', retries=0)
+
+    await ant.main()
     # retry condition
 
     class Test3Ant(Test2Ant):
@@ -95,6 +97,8 @@ async def test_ant_with_retry():
     ant.request_retries = 1
     with pytest.raises(RetryError):
         await ant.request('https://www.test.com')
+
+    await ant.main()
 
 
 @pytest.mark.asyncio
@@ -131,6 +135,8 @@ async def test_with_timeout():
     with pytest.raises(RetryError):
         await ant.request('http://www.test.com')
     assert ant.retries == ant.request_retries + 1
+
+    await ant.main()
 
 
 @pytest.mark.asyncio
@@ -177,10 +183,20 @@ async def test_with_real_request():
     res = await ant.request(httpbin_base_url)
     assert res.status == 200
     # method
-    for method in ['GET', 'POST', 'DELETE', 'PUT', 'PATCH']:
+    for method in ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD']:
         res = await ant.request(httpbin_base_url + 'anything', method=method)
         assert res.status == 200
-        assert res.simple_json['method'] == method
+        if method != 'HEAD':
+            assert res.simple_json['method'] == method
+        else:
+            assert res.simple_text == ''
+        # short way
+        res = await getattr(ant, method.lower())(httpbin_base_url + 'anything')
+        assert res.status == 200
+        if method != 'HEAD':
+            assert res.simple_json['method'] == method
+        else:
+            assert res.simple_text == ''
     # timeout
     with pytest.raises(asyncio.TimeoutError):
         await ant.request(httpbin_base_url, timeout=0.001, retries=0)
@@ -189,12 +205,12 @@ async def test_with_real_request():
     assert res.status == 200
     assert res.simple_json['args']['k1'] == 'v1'
     assert res.simple_json['args']['k2'] == 'v2'
-    res = await ant.request(httpbin_base_url + 'get', params={'k1': 'v1', 'k2': 'v2'})
+    res = await ant.get(httpbin_base_url + 'get', params={'k1': 'v1', 'k2': 'v2'})
     assert res.status == 200
     assert res.simple_json['args']['k1'] == 'v1'
     assert res.simple_json['args']['k2'] == 'v2'
     # data with str
-    res = await ant.request(httpbin_base_url + 'post', method='POST', data='Test data')
+    res = await ant.post(httpbin_base_url + 'post', data='Test data')
     assert res.status == 200
     assert res.simple_json['data'] == 'Test data'
     # data with dict
@@ -241,9 +257,12 @@ async def test_with_real_request():
     ant.request_proxies.append(proxy)
     res = await ant.request('http://httpbin.org/anything')
     assert res.status == 200
-
+    # no proxy anymore
     ant.request_proxies.pop()
-    res = await ant.request('http://httpbin.org/anything', proxy=proxy)
+    res = await ant.request('http://httpbin.org/anything')
+    assert res.status == 200
+    # set proxy by request
+    res = await ant.get('http://httpbin.org/anything', proxy=proxy)
     assert res.status == 200
     # with stream
     ant.response_in_stream = True
