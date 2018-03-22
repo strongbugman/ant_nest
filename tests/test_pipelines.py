@@ -8,6 +8,7 @@ from yarl import URL
 import aiofiles
 
 from ant_nest import *
+from .test_things import fake_response
 
 
 @pytest.mark.asyncio
@@ -18,8 +19,8 @@ async def test_pipeline():
 
 def test_response_filter_error_pipeline():
     pl = ResponseFilterErrorPipeline()
-    res = Response('GET', URL('https://test.com'))
-    err_res = Response('GET', URL('https://test.com'))
+    res = fake_response(b'')
+    err_res = fake_response(b'')
     res.status = 200
     err_res.status = 403
     assert res is pl.process(res)

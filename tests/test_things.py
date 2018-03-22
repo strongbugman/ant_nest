@@ -9,6 +9,16 @@ from ant_nest import CliAnt
 from ant_nest.cli import *
 
 
+def fake_response(content):
+    res = Response('GET', URL('http://test.com'), writer=None, continue100=None, timer=None,
+                   request_info=None, auto_decompress=None, traces=None, loop=asyncio.get_event_loop(),
+                   session=None)
+    res._content = content
+    res._body = content
+
+    return res
+
+
 def test_request():
     req = Request('GET', URL('http://test.com'))
     assert req.method == 'GET'
@@ -16,18 +26,15 @@ def test_request():
 
 
 def test_response():
-    req = Request('GET', URL('http://test.com'))
-    res = Response('GET', req.url)
-    res._content = b'1'
+    res = fake_response(b'1')
     assert res.get_text(encoding='utf-8') == '1'
     assert res.simple_text == '1'
     assert res.simple_json == 1
 
-    res = Response('GET', req.url)
-    res._content = None
+    res = fake_response(None)
     with pytest.raises(ValueError):
         res.get_text()
-    res._content = b'1'
+    res = fake_response(b'1')
     res.get_encoding = lambda: 'utf-8'
     assert res.get_text() == '1'
 
@@ -135,8 +142,7 @@ def test_extract():
 
     request = Request('GET', URL('https://www.python.org/'))
     with open('./tests/test.html', 'rb') as f:
-        response = Response('GET', request.url)
-        response._content = f.read()
+        response = fake_response(f.read())
         response.get_text(encoding='utf-8')
     # extract item with xpath and regex
     item_extractor = ItemExtractor(TestItem)
@@ -158,8 +164,7 @@ def test_extract():
     class TestItem(Item):
         author = StringField()
 
-    response = Response('GET', request.url)
-    response._content = b'{"a": {"b": {"c": 1}}, "d": null}'
+    response = fake_response(b'{"a": {"b": {"c": 1}}, "d": null}')
     response.get_text(encoding='utf-8')
     item_extractor = ItemExtractor(TestItem)
     item_extractor.add_jpath('author', 'a.b.c')
@@ -172,8 +177,7 @@ def test_extract():
         ItemExtractor.extract_value('something else', 'test', 'test')
     # ItemNestExtractor tests
     with open('./tests/test.html', 'rb') as f:
-        response = Response('GET', request.url)
-        response._content = f.read()
+        response = fake_response(f.read())
         response.get_text(encoding='utf-8')
     item_nest_extractor = ItemNestExtractor('xpath', '//div[@id="nest"]/div', Item)
     item_nest_extractor.add_xpath('xpath', './p/text()')
@@ -188,8 +192,7 @@ def test_extract():
         item_nest_extractor.extract(response)
     # extract with wrappers
     with open('./tests/test.html', 'rb') as f:
-        response = Response('GET', request.url)
-        response._content = f.read()
+        response = fake_response(f.read())
         response.get_text(encoding='utf-8')
     assert extract_value_by_xpath('/html/body/div/p/text()', response.html_element) == 'test'
     assert extract_value_by_xpath('/html/body/div/p/text()', response) == 'test'
@@ -216,8 +219,7 @@ def test_cli_run_ant():
 
 def test_cli_open_browser():
     req = Request('GET', URL('http://test.com'))
-    res = Response('GET', req.url)
-    res._content = b''
+    res = fake_response(b'')
 
     def open_browser_function(url):
         return True
