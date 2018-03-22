@@ -6,6 +6,7 @@ from tenacity import RetryError
 import asyncio
 
 from ant_nest import *
+from .test_things import fake_response
 
 
 @pytest.mark.asyncio
@@ -29,7 +30,7 @@ async def test_ant():
             assert self.item_pipelines[0].count == 1
 
         async def _request(self, req: Request):
-            return Response('GET', req.url)
+            return fake_response(b'')
 
     ant = TestAnt()
     await ant.main()
@@ -60,7 +61,7 @@ async def test_ant_with_retry():
                 self.retries += 1
                 raise IOError()
             else:
-                res = Response('GET', req.url)
+                res = fake_response(b'')
                 res.status = 200
                 return res
 
@@ -84,11 +85,11 @@ async def test_ant_with_retry():
         async def _request(self, req: Request):
             if self.retries < self.min_retries:
                 self.retries += 1
-                res = Response('GET', req.url)
+                res = fake_response(b'')
                 res.status = 500
                 return res
             else:
-                res = Response('GET', req.url)
+                res = fake_response(b'')
                 res.status = 200
                 return res
 
@@ -118,7 +119,7 @@ async def test_with_timeout():
         async def _request(self, req: Request):
             self.retries += 1
             await asyncio.sleep(self.sleep_time)
-            res = Response('GET', req.url)
+            res = fake_response(b'')
             res.status = 200
             return res
 

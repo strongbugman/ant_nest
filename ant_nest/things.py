@@ -42,12 +42,12 @@ class Response(ClientResponse):
         self._json = None
 
     def get_text(self, encoding: Optional[str]=None, errors: str='strict') -> str:
-        if self._content is None:
+        if self._body is None:
             raise ValueError('Read stream first')
         if self._text is None:
             if encoding is None:
                 encoding = self.get_encoding()
-            self._text = self._content.decode(encoding, errors=errors)
+            self._text = self._body.decode(encoding, errors=errors)
         return self._text
 
     @property
