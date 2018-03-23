@@ -18,9 +18,7 @@ from .ant import Ant
 from .things import Response
 from . import __version__
 
-
 __all__ = ['get_ants', 'run_ant', 'open_response_in_browser']
-
 
 __signal_count = 0
 
@@ -46,7 +44,8 @@ def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
     # get and sift ant class obj from modules
     for module in modules:
         for name, obj in inspect.getmembers(module):
-            if isinstance(obj, type) and issubclass(obj, Ant) and obj is not Ant:
+            if (isinstance(obj, type) and
+                    issubclass(obj, Ant) and obj is not Ant):
                 results[module.__name__ + '.' + obj.__name__] = obj
     return results
 
@@ -70,8 +69,9 @@ def shutdown_ant(ant: Ant):
             break
 
 
-def open_response_in_browser(response: Response, file_type: str='.html',
-                             _open_browser_function: Callable[..., bool]=webbrowser.open) -> bool:
+def open_response_in_browser(
+        response: Response, file_type: str = '.html',
+        _open_browser_function: Callable[..., bool] = webbrowser.open) -> bool:
     fd, path = tempfile.mkstemp(file_type)
     os.write(fd, response._content)
     os.close(fd)
@@ -82,7 +82,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--ant', help='ant name')
     parser.add_argument('-l', '--list', help='list ants', action='store_true')
-    parser.add_argument('-v', '--version', help='get package version', action='store_true')
+    parser.add_argument('-v', '--version', help='get package version',
+                        action='store_true')
     args = parser.parse_args()
     sys.path.append(os.getcwd())
 

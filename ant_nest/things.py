@@ -1,5 +1,6 @@
-"""The thing`s usage is simple, can be created by ant, processed by ants and pipelines"""
-from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, DefaultDict, AnyStr, IO, Callable, Generator
+"""Provide Ant`s Request, Response, Item and Extractor."""
+from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, \
+    DefaultDict, AnyStr, IO, Callable, Generator
 from collections.abc import MutableMapping
 import abc
 from collections import defaultdict, namedtuple
@@ -13,15 +14,15 @@ import simplejson
 
 from .exceptions import FieldValidationError, ItemExtractError
 
-
-ConnectionKey = namedtuple('ConnectionKey', ['host', 'port', 'ssl', 'proxy_host', 'proxy_port'])
+ConnectionKey = namedtuple('ConnectionKey',
+                           ['host', 'port', 'ssl', 'proxy_host', 'proxy_port'])
 
 
 class Request(ClientRequest):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # store data obj
-        self.data = kwargs.get('data', None)  # type: Union[AnyStr, dict, IO, None]
+        self.data: Union[AnyStr, dict, IO, None] = kwargs.get('data', None)
 
     @property
     def connection_key(self):
@@ -31,7 +32,8 @@ class Request(ClientRequest):
         else:
             proxy_host = None
             proxy_port = None
-        return ConnectionKey(self.host, self.port, self.is_ssl(), proxy_host, proxy_port)
+        return ConnectionKey(self.host, self.port, self.is_ssl(), proxy_host,
+                             proxy_port)
 
 
 class Response(ClientResponse):
@@ -41,7 +43,8 @@ class Response(ClientResponse):
         self._html_element = None
         self._json = None
 
-    def get_text(self, encoding: Optional[str]=None, errors: str='strict') -> str:
+    def get_text(self, encoding: Optional[str] = None,
+                 errors: str = 'strict') -> str:
         if self._body is None:
             raise ValueError('Read stream first')
         if self._text is None:
@@ -54,7 +57,7 @@ class Response(ClientResponse):
     def simple_text(self) -> str:
         return self.get_text(errors='ignore')
 
-    def get_json(self, loads: Callable=simplejson.loads):
+    def get_json(self, loads: Callable = simplejson.loads):
         if self._json is None:
             self._json = loads(self.simple_text)
         return self._json
@@ -71,6 +74,8 @@ class Response(ClientResponse):
 
 
 class CustomNoneType:
+    """Different with "None" obj ("null" in json)
+    """
     pass
 
 
@@ -79,10 +84,11 @@ class IntField:
     storage_name = ''
     __shadow_name_prefix = '__field#'
 
-    def __init__(self, null: bool=False, default: Any=CustomNoneType()):
+    def __init__(self, null: bool = False, default: Any = CustomNoneType()):
         """
-        "null" is True means this field can be ignore when value have not been set in validation,
-        "default" is None means this field have no default value
+        :param null, is True means this field can be ignore when value have
+            not been set in validation,
+        :param default is None means this field have no default value
         """
         self.null = null
         self.default = default
@@ -95,8 +101,9 @@ class IntField:
             return getattr(instance, self.storage_name)
         except AttributeError as e:
             raise AttributeError(
-                '\'{:s}\' object has no attribute \'{:s}\''.format(instance.__class__.__name__,
-                                                                   self.get_name_from_shadow(self.storage_name))) from e
+                '\'{:s}\' object has no attribute \'{:s}\''.format(
+                    instance.__class__.__name__,
+                    self.get_name_from_shadow(self.storage_name))) from e
 
     def __delete__(self, instance):
         delattr(instance, self.storage_name)
@@ -111,7 +118,9 @@ class IntField:
     @classmethod
     def make_shadow_name(cls, name: str) -> str:
         if name == cls.__shadow_name_prefix:
-            raise AttributeError('This name: {:s} has been used internally'.format(cls.__shadow_name_prefix))
+            raise AttributeError(
+                'This name: {:s} has been used internally'.format(
+                    cls.__shadow_name_prefix))
         return cls.__shadow_name_prefix + name
 
     @classmethod
@@ -136,11 +145,12 @@ class BytesField(IntField):
 
 
 # store all item class`s field reference
-_fields = defaultdict(dict)  # type: DefaultDict[Type['Item'], Dict[str, IntField]]
+_fields: DefaultDict[Type['Item'], Dict[str, IntField]] = defaultdict(dict)
 
 
 class ItemMeta(abc.ABCMeta):
-    def __init__(cls, name: str, bases: Tuple[type, ...], attr_dict: Dict[str, Any]):
+    def __init__(cls, name: str, bases: Tuple[type, ...],
+                 attr_dict: Dict[str, Any]):
         super().__init__(name, bases, attr_dict)
         for k, v in attr_dict.items():
             if isinstance(v, IntField):
@@ -154,6 +164,7 @@ class ItemMeta(abc.ABCMeta):
 
 
 class Item(MutableMapping, metaclass=ItemMeta):
+    """Simple dict-like object with validation"""
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -166,7 +177,9 @@ class Item(MutableMapping, metaclass=ItemMeta):
         if isinstance(key, str):
             super().__setattr__(key, value)
         else:
-            raise AttributeError('attribute name must be string, not \'{:s}\''.format(key.__class__.__name__))
+            raise AttributeError(
+                'attribute name must be string, not \'{:s}\''.format(
+                    key.__class__.__name__))
 
     def __setitem__(self, key: str, value: Any) -> None:
         try:
@@ -206,7 +219,8 @@ class Item(MutableMapping, metaclass=ItemMeta):
                 setattr(self, k, obj.validate(getattr(self, k)))
             elif not obj.null:
                 raise FieldValidationError(
-                    '\'{:s}.{:s}\' have no value yet'.format(self.__class__.__name__, k))
+                    '\'{:s}.{:s}\' have no value yet'.format(
+                        self.__class__.__name__, k))
 
     def __repr__(self):
         return '{:s}: {:s}'.format(self.__class__.__name__, str(dict(self)))
@@ -226,12 +240,15 @@ class ItemExtractor:
     def __init__(self, item_class: Type[Item]):
         self.item_class = item_class
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.paths = defaultdict(list)  # type: DefaultDict[str, List[Tuple[str, str, str]]]
+        self.paths: DefaultDict[str, List[Tuple[str, str, str]]] = \
+            defaultdict(list)
 
-    def add_xpath(self, key: str, xpath: str, extract_type=extract_with_take_first):
+    def add_xpath(self, key: str, xpath: str,
+                  extract_type=extract_with_take_first):
         self.paths[key].append(('xpath', xpath, extract_type))
 
-    def add_regex(self, key: str, pattern: str, extract_type=extract_with_take_first):
+    def add_regex(self, key: str, pattern: str,
+                  extract_type=extract_with_take_first):
         self.paths[key].append(('regex', pattern, extract_type))
 
     def add_jpath(self, key: str, jpath, extract_type=extract_with_take_first):
@@ -255,13 +272,11 @@ class ItemExtractor:
             data = data.simple_json
         elif isinstance(data, str):
             data = simplejson.loads(data)
-        try:
-            return jpath.get_all(pattern, data)
-        except KeyError:  # it seem is a bug in "jpath" lib, should return "[]" other than raise a error
-            return []
+        return jpath.get_all(pattern, data)
 
     @staticmethod
-    def _xpath_search(pattern: str, data: Any) -> List[Union[str, html.HtmlElement]]:
+    def _xpath_search(pattern: str, data: Any
+                      ) -> List[Union[str, html.HtmlElement]]:
         if isinstance(data, Response):
             data = data.html_element
         elif not isinstance(data, html.HtmlElement):
@@ -269,7 +284,8 @@ class ItemExtractor:
         return data.xpath(pattern)
 
     @staticmethod
-    def extract_value(_type: str, pattern: str, data: Any, extract_type=extract_with_take_first) -> Any:
+    def extract_value(_type: str, pattern: str, data: Any,
+                      extract_type=extract_with_take_first) -> Any:
         if _type == 'xpath':
             extract_value = ItemExtractor._xpath_search(pattern, data)
         elif _type == 'regex':
@@ -282,25 +298,31 @@ class ItemExtractor:
         if extract_type == ItemExtractor.extract_with_take_first:
             extract_value = extract_value[0]
         elif extract_type == ItemExtractor.extract_with_join_all:
-            extract_value = list(filter(lambda x: isinstance(x, str), extract_value))  # join string only
+            extract_value = list(filter(lambda x: isinstance(x, str),
+                                        extract_value))  # join string only
             extract_value = ''.join(extract_value)
         return extract_value
 
     def extract(self, data: Any) -> Item:
-        """Extract item from response or other data by xpath, jpath or regex."""
-        self.logger.debug('Extract item: {:s} with path: {:s}'.format(self.item_class.__name__, str(self.paths)))
+        """Extract item from response or other data by xpath,
+        jpath or regex."""
+        self.logger.debug('Extract item: {:s} with path: {:s}'.format(
+            self.item_class.__name__, str(self.paths)))
         item = self.item_class()
         for key, paths in self.paths.items():
-            value = CustomNoneType()  # be different with "None" obj ("null" in json)
+            value = CustomNoneType()
             for path_type, path, extract_type in paths:
                 try:
-                    extract_value = ItemExtractor.extract_value(path_type, path, data, extract_type=extract_type)
+                    extract_value = ItemExtractor.extract_value(
+                        path_type, path, data, extract_type=extract_type)
                 except IndexError:  # IndexError is often raised
                     continue
                 # check multiple path`s result
-                if not isinstance(value, CustomNoneType) and value != extract_value:
+                if not isinstance(value,
+                                  CustomNoneType) and value != extract_value:
                     raise ItemExtractError(
-                        'Match different result: {:s} and {:s} for paths: {:s}'.format(value, extract_value, str(paths)))
+                        'Match different result: {:s} and {:s} for paths: '
+                        '{:s}'.format(value, extract_value, str(paths)))
                 value = extract_value
             if not isinstance(value, CustomNoneType):
                 item[key] = value
@@ -308,7 +330,8 @@ class ItemExtractor:
 
 
 class ItemNestExtractor(ItemExtractor):
-    def __init__(self, root_path_type: str, root_path: str, item_class: Type[Item]):
+    def __init__(self, root_path_type: str, root_path: str,
+                 item_class: Type[Item]):
         self.root_path_type = root_path_type
         self.root_path = root_path
         super().__init__(item_class)
@@ -317,11 +340,13 @@ class ItemNestExtractor(ItemExtractor):
         raise NotImplementedError('This method is dropped in this class')
 
     def extract_items(self, response: Response) -> Generator[Item, None, None]:
-        base_data = self.extract_value(self.root_path_type, self.root_path, response,
-                                       extract_type=self.extract_with_do_nothing)
+        base_data = self.extract_value(
+            self.root_path_type, self.root_path, response,
+            extract_type=self.extract_with_do_nothing)
         for data in base_data:
             yield super().extract(data)
 
 
-__all__ = ['Request', 'Response', 'Item', 'ItemExtractor', 'ItemNestExtractor', 'Things'] +\
+__all__ = ['Request', 'Response', 'Item', 'ItemExtractor', 'ItemNestExtractor',
+           'Things'] + \
           [var for var in vars().keys() if 'Field' in var]

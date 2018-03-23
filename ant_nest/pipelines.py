@@ -1,4 +1,5 @@
-from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union, Sequence, Coroutine, AnyStr
+from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union, \
+    Sequence, AnyStr
 import asyncio
 import logging
 from collections import defaultdict
@@ -61,8 +62,8 @@ class RequestDuplicateFilterPipeline(Pipeline):
 
 
 class RequestUserAgentPipeline(Pipeline):
-    user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ' \
-                 'Chrome/51.0.2704.103 Safari/537.36'
+    user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 ' \
+                 '(KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36'
 
     def __init__(self, user_agent=user_agent):
         super().__init__()
@@ -87,29 +88,37 @@ class RequestRandomUserAgentPipeline(Pipeline):
     }
     BROWSER_FORMATS = {
         'Firefox': 'Gecko/20100101 Firefox/{firefox_version}',
-        'Safari': 'AppleWebKit/{webkit_version} (KHTML, like Gecko) Version/{safari_version} Safari/{safari_version2}',
-        'Chrome': 'AppleWebKit/{webkit_version} (KHTML, like Gecko) Chrome/{chrome_version} Safari/{safari_version2}',
+        'Safari': 'AppleWebKit/{webkit_version} (KHTML, like Gecko) '
+                  'Version/{safari_version} Safari/{safari_version2}',
+        'Chrome': 'AppleWebKit/{webkit_version} (KHTML, like Gecko) '
+                  'Chrome/{chrome_version} Safari/{safari_version2}',
     }
     FORMAT_VARS = {
         'unix-like_os': ('Linux', 'FreeBSD'),
         'cpu_type': ('x86_64', 'i386', 'amd64'),
-        'macos_version': ('10_10_1', '10_11_1', '10_11_2', '10_12_2', '10_12_3', '10_13_3'),
+        'macos_version': (
+            '10_10_1', '10_11_1', '10_11_2', '10_12_2', '10_12_3', '10_13_3'),
         'windows_version': ('5_0', '5_1', '5_2', '6_0', '6_1', '10_0'),
-        'android_version': ('4_4', '5_0', '5_1', '6_0', '6_1', '7_0', '7_1', '8_0'),
+        'android_version': (
+            '4_4', '5_0', '5_1', '6_0', '6_1', '7_0', '7_1', '8_0'),
         'ios_driver': ('iPone', 'iPod', 'iPad'),
-        'ios_version': ('6_0', '7_0', '8_1', '9_2', '10_3', '10_2_3', '11_3_3'),
+        'ios_version': (
+            '6_0', '7_0', '8_1', '9_2', '10_3', '10_2_3', '11_3_3'),
         'firefox_version': ('27.3', '28.0', '31.0', '40.1'),
         'webkit_version': ('533.18.1', '533.19.4', '533.20.25', '534.55.3'),
         'safari_version': ('4.0.1', '5.0.4', '5.1.3', '6.0', '7.0.3'),
         'safari_version2': ('530.19.1', '531.9', '533.16', '533.20.27'),
-        'chrome_version': ('41.0.2226.0', '60.0.1325.223', '62.0.1532.123', '64.0.3282.119')
+        'chrome_version': (
+            '41.0.2226.0', '60.0.1325.223', '62.0.1532.123', '64.0.3282.119')
     }
 
     def __init__(self, system: str = 'random', browser: str = 'random'):
         if system != 'random' and system not in self.SYSTEM_FORMATS.keys():
-            raise ValueError('The system {:s} is not supported!'.format(system))
+            raise ValueError(
+                'The system {:s} is not supported!'.format(system))
         if browser != 'random' and browser not in self.BROWSER_FORMATS.keys():
-            raise ValueError('The browser {:s} is not supported!'.format(browser))
+            raise ValueError(
+                'The browser {:s} is not supported!'.format(browser))
 
         self.system = system
         self.browser = browser
@@ -133,14 +142,18 @@ class RequestRandomUserAgentPipeline(Pipeline):
         if self.system != 'random':
             system_format = self.SYSTEM_FORMATS[self.system]
         else:
-            system_format = self.SYSTEM_FORMATS[self.choice(list(self.SYSTEM_FORMATS.keys()))]
+            system_format = self.SYSTEM_FORMATS[
+                self.choice(list(self.SYSTEM_FORMATS.keys()))]
 
         if self.browser != 'random':
             browser_format = self.BROWSER_FORMATS[self.browser]
         else:
-            browser_format = self.BROWSER_FORMATS[self.choice(list(self.BROWSER_FORMATS.keys()))]
+            browser_format = self.BROWSER_FORMATS[
+                self.choice(list(self.BROWSER_FORMATS.keys()))]
 
-        return self.USER_AGENT_FORMAT.format(system=self._format(system_format), browser=self._format(browser_format))
+        return self.USER_AGENT_FORMAT.format(
+            system=self._format(system_format),
+            browser=self._format(browser_format))
 
     def process(self, thing: Request) -> Request:
         thing.headers['User-Agent'] = self.create()
@@ -179,7 +192,8 @@ class ItemValidatePipeline(Pipeline):
 
 
 class ItemFieldReplacePipeline(Pipeline):
-    def __init__(self, fields: List[str], excess_chars: Tuple[str] = ('\r', '\n', '\t')):
+    def __init__(self, fields: List[str],
+                 excess_chars: Tuple[str] = ('\r', '\n', '\t')):
         self.fields = fields
         self.excess_chars = excess_chars
         super().__init__()
@@ -200,7 +214,7 @@ class ItemBaseFileDumpPipeline(Pipeline):
         """Dump data(binary or text, stream or normal, async or not) to disk file.
         IO data will be closed.
         """
-        chunk = None  # type: Optional[Union[AnyStr]]
+        chunk: Optional[Union[AnyStr]] = None
         if isinstance(data, str):
             file_mode = 'w'
         elif isinstance(data, bytes):
@@ -215,7 +229,8 @@ class ItemBaseFileDumpPipeline(Pipeline):
             else:
                 file_mode = 'wb'
         else:
-            raise ValueError('The type {:s} is not supported'.format(type(data).__class__.__name__))
+            raise ValueError('The type {:s} is not supported'.format(
+                type(data).__class__.__name__))
 
         async with aiofiles.open(file_path, file_mode) as file:
             if chunk is not None:  # in streaming
@@ -240,10 +255,11 @@ class ItemBaseFileDumpPipeline(Pipeline):
 
 class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
     """Dump item to json during pipeline closing"""
+
     def __init__(self, file_dir: str = '.'):
         super().__init__()
         self.file_dir = file_dir
-        self.data = defaultdict(list)  # type: DefaultDict[str, List[Dict]]
+        self.data: DefaultDict[str, List[Dict]] = defaultdict(list)
 
     def process(self, thing: Item) -> Item:
         self.data[thing.__class__.__name__].append(dict(thing))
@@ -252,11 +268,13 @@ class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
     async def on_spider_close(self) -> None:
         for file_name, data in self.data.items():
             data = json.dumps(data)
-            await self.dump(os.path.join(self.file_dir, file_name + '.json'), data)
+            await self.dump(os.path.join(self.file_dir, file_name + '.json'),
+                            data)
 
 
 class ItemBaseMysqlPipeline(Pipeline):
-    def __init__(self, host: str, port: int, user: str, password: str, database: str, table: str,
+    def __init__(self, host: str, port: int, user: str, password: str,
+                 database: str, table: str,
                  charset: str = 'utf8'):
         super().__init__()
         self.host = host
@@ -268,8 +286,12 @@ class ItemBaseMysqlPipeline(Pipeline):
         self.charset = charset
 
     async def create_pool(self) -> aiomysql.Pool:
-        return await aiomysql.create_pool(host=self.host, port=self.port, user=self.user, password=self.password,
-                                          db=self.database, charset=self.charset, use_unicode=True)
+        return await aiomysql.create_pool(host=self.host, port=self.port,
+                                          user=self.user,
+                                          password=self.password,
+                                          db=self.database,
+                                          charset=self.charset,
+                                          use_unicode=True)
 
     async def push_data(self, sql: str, pool: aiomysql.Pool) -> None:
         """Run SQL without pulling data like "INSERT" and "UPDATE" command"""
@@ -279,7 +301,8 @@ class ItemBaseMysqlPipeline(Pipeline):
                 await cur.execute(sql)
             await conn.commit()
 
-    async def pull_data(self, sql: str, pool: aiomysql.Pool) -> Tuple[Dict[str, Any]]:
+    async def pull_data(self, sql: str, pool: aiomysql.Pool
+                        ) -> Tuple[Dict[str, Any]]:
         """Run SQL with pulling data like "SELECT" command"""
         self.logger.debug('Executing SQL: ' + sql)
         async with pool.acquire() as conn:
@@ -304,7 +327,8 @@ class ItemBaseMysqlPipeline(Pipeline):
 
 
 class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
-    sql_format = 'INSERT IGNORE INTO `{database}`.`{table}` ({fields}) VALUES ({values})'
+    sql_format = 'INSERT IGNORE INTO `{database}`.`{table}` ({fields}) ' \
+                 'VALUES ({values})'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -323,18 +347,22 @@ class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
         for k, v in thing.items():
             fields.append(k)
             values.append(self.convert_item_value(v))
-        sql = self.sql_format.format(database=self.database, table=self.table, fields='`' + '`,`'.join(fields) + '`',
+        sql = self.sql_format.format(database=self.database, table=self.table,
+                                     fields='`' + '`,`'.join(fields) + '`',
                                      values=','.join(values))
         await self.push_data(sql, self.pool)
         return thing
 
 
 class ItemMysqlUpdatePipeline(ItemMysqlInsertPipeline):
-    sql_format = 'UPDATE `{database}`.`{table}` SET {pairs} WHERE `{primary_key}`={primary_value}'
+    sql_format = 'UPDATE `{database}`.`{table}` SET {pairs} WHERE ' \
+                 '`{primary_key}`={primary_value}'
 
-    def __init__(self, primary_key: str, host: str, port: int, user: str, password: str, database: str, table: str,
+    def __init__(self, primary_key: str, host: str, port: int, user: str,
+                 password: str, database: str, table: str,
                  charset: str = 'utf8'):
-        super().__init__(host, port, user, password, database, table, charset=charset)
+        super().__init__(host, port, user, password, database, table,
+                         charset=charset)
         self.primary_key = primary_key
 
     async def process(self, thing: Item) -> Item:
@@ -345,17 +373,22 @@ class ItemMysqlUpdatePipeline(ItemMysqlInsertPipeline):
             if k == self.primary_key:
                 primary_value = self.convert_item_value(v)
             else:
-                pairs.append('`{:s}`={:s}'.format(k, self.convert_item_value(v)))
+                pairs.append(
+                    '`{:s}`={:s}'.format(k, self.convert_item_value(v)))
 
         if primary_value is not None:
-            sql = self.sql_format.format(database=self.database, table=self.table, pairs=','.join(pairs),
-                                         primary_key=self.primary_key, primary_value=primary_value)
+            sql = self.sql_format.format(database=self.database,
+                                         table=self.table,
+                                         pairs=','.join(pairs),
+                                         primary_key=self.primary_key,
+                                         primary_value=primary_value)
             await self.push_data(sql, self.pool)
         return thing
 
 
 class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
-    sql_format = 'INSERT INTO `{database}`.`{table}` ({fields}) VALUES ({values}) on duplicate key update {pairs}'
+    sql_format = 'INSERT INTO `{database}`.`{table}` ({fields}) VALUES ' \
+                 '({values}) on duplicate key update {pairs}'
 
     def __init__(self, update_keys: List[str], *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -371,15 +404,19 @@ class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
             values.append(v)
             if k in self.update_keys:
                 pairs.append('`{:s}`={:s}'.format(k, v))
-        sql = self.sql_format.format(database=self.database, table=self.table, fields='`' + '`,`'.join(fields) + '`',
-                                     values=','.join(values), pairs=','.join(pairs))
+        sql = self.sql_format.format(database=self.database, table=self.table,
+                                     fields='`' + '`,`'.join(fields) + '`',
+                                     values=','.join(values),
+                                     pairs=','.join(pairs))
         await self.push_data(sql, self.pool)
         return thing
 
 
 class ItemBaseEmailPipeline(Pipeline):
-    def __init__(self, account: str, password: str, server: str, port: int, recipients: List[str],
-                 sender_name: str = 'AntNest.ItemEmailPipeline', tls: bool = False, starttls: bool = False):
+    def __init__(self, account: str, password: str, server: str, port: int,
+                 recipients: List[str],
+                 sender_name: str = 'AntNest.ItemEmailPipeline',
+                 tls: bool = False, starttls: bool = False):
         super().__init__()
         self.account = account
         self.password = password
@@ -400,7 +437,8 @@ class ItemBaseEmailPipeline(Pipeline):
         await smtp.login(self.account, self.password)
         return smtp
 
-    async def send(self, smtp: aiosmtplib.SMTP, title: str, content: str, attachments: Optional[List[IO]] = None):
+    async def send(self, smtp: aiosmtplib.SMTP, title: str, content: str,
+                   attachments: Optional[List[IO]] = None):
         if attachments is None:
             msg = MIMEText(content)
         else:
@@ -409,7 +447,8 @@ class ItemBaseEmailPipeline(Pipeline):
             for f in attachments:
                 att = MIMEText(f.read(), 'base64', 'utf-8')
                 att["Content-Type"] = 'application/octet-stream'
-                att["Content-Disposition"] = 'attachment; filename="{:s}"'.format(f.name)
+                att["Content-Disposition"] = \
+                    'attachment; filename="{:s}"'.format(f.name)
                 msg.attach(att)
         msg['From'] = '{:s} <{:s}>'.format(self.sender_name, self.account)
         msg['To'] = '<' + '> <'.join(self.recipients) + '>'
@@ -429,13 +468,16 @@ class ItemEmailPipeline(ItemBaseEmailPipeline):
 
     async def on_spider_close(self) -> None:
         smtp = await self.create_smtp()
-        await self.send(smtp, self.title, '\n'.join(item.__repr__() for item in self.items))
+        await self.send(smtp, self.title,
+                        '\n'.join(item.__repr__() for item in self.items))
         smtp.close()
 
 
 class ItemBaseRedisPipeline(Pipeline):
-    def __init__(self, address: str, db: Optional[int] = None, password: Optional[str] = None, encoding: str = 'utf-8',
-                 minsize: int = 1, maxsize: int = 10, ssl: Optional[bool] = None, timeout: Optional[float] = None):
+    def __init__(self, address: str, db: Optional[int] = None,
+                 password: Optional[str] = None, encoding: str = 'utf-8',
+                 minsize: int = 1, maxsize: int = 10,
+                 ssl: Optional[bool] = None, timeout: Optional[float] = None):
         super().__init__()
         self.address = address
         self.db = db
@@ -448,7 +490,8 @@ class ItemBaseRedisPipeline(Pipeline):
 
     async def create_redis(self) -> aioredis.ConnectionsPool:
         return await aioredis.create_redis_pool(
-            self.address, db=self.db, password=self.password, encoding=self.encoding, minsize=self.minsize,
+            self.address, db=self.db, password=self.password,
+            encoding=self.encoding, minsize=self.minsize,
             maxsize=self.maxsize, ssl=self.ssl, timeout=self.timeout)
 
 

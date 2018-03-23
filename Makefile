@@ -13,6 +13,7 @@ destroy_test_env:
 
 test:
 	python setup.py test --addopts='--cov=.'
+	flake8 ant_nest
 
 tag:
 	git tag $(version) -m "Release of version $(version)"
