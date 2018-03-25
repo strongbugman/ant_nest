@@ -60,6 +60,10 @@ class Ant(abc.ABC):
                                    timeout=self.pool_timeout,
                                    raise_exception=self.pool_raise_exception)
 
+    @property
+    def name(self):
+        return self.__class__.__name__
+
     async def request(self, url: Union[str, URL], method: str = 'GET',
                       params: Optional[dict] = None,
                       headers: Optional[dict] = None,

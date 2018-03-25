@@ -57,8 +57,13 @@ async def run_ant(ant: Ant):
 def shutdown_ant(ant: Ant):
     global __signal_count
     if __signal_count == 1:
+        print('Receive shutdown command twice, ant {:s} shutdown '
+              'immediately'.format(ant.name))
         sys.exit()
     __signal_count += 1
+
+    print('Graceful shutdown {:s}...Try again to force '
+          'shutdown'.format(ant.name))
 
     # drop waiting coroutines in coroutines pool
     ant.pool._is_closed = True
@@ -116,6 +121,8 @@ def main():
             ant = ants[ant_name]()
 
             loop.add_signal_handler(signal.SIGINT,
+                                    functools.partial(shutdown_ant, ant))
+            loop.add_signal_handler(signal.SIGTERM,
                                     functools.partial(shutdown_ant, ant))
             asyncio.get_event_loop().run_until_complete(run_ant(ant))
         else:
