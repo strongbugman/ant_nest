@@ -30,4 +30,4 @@ github_release:
 release: tag github_release pypi_release
 
 clean:
-	rm -rf .egg *.egg-info dist build
+	rm -rf .eggs *.egg-info dist build
