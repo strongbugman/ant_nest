@@ -3,7 +3,7 @@ from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union, \
 import asyncio
 import logging
 from collections import defaultdict
-import json
+import ujson
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -267,7 +267,7 @@ class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
 
     async def on_spider_close(self) -> None:
         for file_name, data in self.data.items():
-            data = json.dumps(data)
+            data = ujson.dumps(data)
             await self.dump(os.path.join(self.file_dir, file_name + '.json'),
                             data)
 

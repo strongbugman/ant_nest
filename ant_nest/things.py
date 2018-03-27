@@ -10,7 +10,7 @@ import re
 from aiohttp import ClientResponse, ClientRequest
 from lxml import html
 import jpath
-import simplejson
+import ujson
 
 from .exceptions import FieldValidationError, ItemExtractError
 
@@ -57,7 +57,7 @@ class Response(ClientResponse):
     def simple_text(self) -> str:
         return self.get_text(errors='ignore')
 
-    def get_json(self, loads: Callable = simplejson.loads):
+    def get_json(self, loads: Callable = ujson.loads):
         if self._json is None:
             self._json = loads(self.simple_text)
         return self._json
@@ -271,7 +271,7 @@ class ItemExtractor:
         if isinstance(data, Response):
             data = data.simple_json
         elif isinstance(data, str):
-            data = simplejson.loads(data)
+            data = ujson.loads(data)
         return jpath.get_all(pattern, data)
 
     @staticmethod
