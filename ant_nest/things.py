@@ -325,7 +325,7 @@ class ItemExtractor:
                         '{:s}'.format(value, extract_value, str(paths)))
                 value = extract_value
             if not isinstance(value, CustomNoneType):
-                item[key] = value
+                setattr(item, key, value)
         return item
 
 
