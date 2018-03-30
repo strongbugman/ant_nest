@@ -6,7 +6,7 @@ from .exceptions import *  # noqa
 from .utils import *  # noqa
 from .utils import CliAnt  # noqa
 
-__version__ = '0.34.0'
+__version__ = '0.34.1'
 
 __all__ = (ant.__all__ + pipelines.__all__ + exceptions.__all__ +  # noqa
            coroutine_pool.__all__ + things.__all__ + utils.__all__)  # noqa
