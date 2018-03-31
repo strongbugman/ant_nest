@@ -14,6 +14,8 @@ import aiomysql
 import aioredis
 import aiosmtplib
 import aiofiles
+from aiohttp.http import SERVER_SOFTWARE
+from aiohttp import hdrs
 
 from .things import Things, Response, Request, Item
 from .exceptions import FieldValidationError, ThingDropped
@@ -70,7 +72,8 @@ class RequestUserAgentPipeline(Pipeline):
         self.user_agent = user_agent
 
     def process(self, thing: Request) -> Request:
-        thing.headers['User-Agent'] = self.user_agent
+        if thing.headers.get(hdrs.USER_AGENT) == SERVER_SOFTWARE:
+            thing.headers[hdrs.USER_AGENT] = self.user_agent
         return thing
 
 
@@ -156,7 +159,8 @@ class RequestRandomUserAgentPipeline(Pipeline):
             browser=self._format(browser_format))
 
     def process(self, thing: Request) -> Request:
-        thing.headers['User-Agent'] = self.create()
+        if thing.headers.get(hdrs.USER_AGENT) == SERVER_SOFTWARE:
+            thing.headers[hdrs.USER_AGENT] = self.create()
         return thing
 
 
