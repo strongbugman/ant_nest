@@ -4,6 +4,7 @@ import os
 import pytest
 from tenacity import RetryError
 import asyncio
+from yarl import URL
 
 from ant_nest import *
 from .test_things import fake_response
@@ -33,6 +34,7 @@ async def test_ant():
             return fake_response(b'')
 
     ant = TestAnt()
+    assert ant.name == 'TestAnt'
     await ant.main()
 
     class Test2Ant(TestAnt):
@@ -173,6 +175,43 @@ async def test_pipelines():
 
 
 @pytest.mark.asyncio
+async def test_ant_report():
+
+    class FakePipeline(Pipeline):
+        def process(self, thing: Request):
+            if thing.host == 'error':
+                raise ThingDropped
+            return thing
+
+    class FakeAnt(Ant):
+        request_pipelines = [FakePipeline()]
+        request_retries = 0
+
+        async def run(self):
+            pass
+
+        async def _request(self, req: Request):
+            return fake_response(b'')
+
+    ant = FakeAnt()
+    # request report
+    await ant.request('http://test.com')
+    assert ant._reports['Request'][1] == 1
+    assert ant._reports['Request'][0] == 0
+    with pytest.raises(ThingDropped):
+        await ant.request('http://error')
+    assert ant._drop_reports['Request'][1] == 1
+
+    ant._last_time -= ant._last_time + 1  # report
+    ant.report(Request('GET', URL('http://test')))
+    assert ant._reports['Request'][0] == 1
+    ant.report(Request('GET', URL('http://test')), dropped=True)
+    assert ant._drop_reports['Request'][0] == 1
+
+    await ant.main()
+
+
+@pytest.mark.asyncio
 async def test_with_real_request():
     httpbin_base_url = os.getenv('TEST_HTTPBIN', 'http://localhost:8080/')
 
@@ -244,15 +283,13 @@ async def test_with_real_request():
     assert res.status == 302
     assert res.cookies['k1'].value == 'v1'
     assert res.cookies['k2'].value == 'v2'
-    # redirects and report
-    ant._last_time -= ant._last_time + 1
+    # redirects
     ant.request_allow_redirects = True
     ant.request_max_redirects = 3
     res = await ant.request(httpbin_base_url + 'redirect/2')
     assert res.status == 200
     res = await ant.request(httpbin_base_url + 'redirect/3')
     assert res.status == 302
-    assert ant._reports['Request'][1] > 12
     # with http proxy
     proxy = os.getenv('TEST_HTTP_PROXY', 'http://bugman:letmein@localhost:3128')
     ant.request_proxies.append(proxy)
@@ -275,6 +312,3 @@ async def test_with_real_request():
         chunk = await res.content.read(10)
         if len(chunk) == 0:
             break
-    # dropped item report
-    ant.report(Item(), dropped=True)
-    await ant.main()

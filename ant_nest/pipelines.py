@@ -211,20 +211,20 @@ class ItemFieldReplacePipeline(Pipeline):
 
 
 class ItemBaseFileDumpPipeline(Pipeline):
-    streaming_buffer_size = 1024 * 1024  # default is 1MB
 
     @classmethod
-    async def dump(cls, file_path: str, data: Union[AnyStr, IO]) -> None:
+    async def dump(cls, file_path: str, data: Union[AnyStr, IO],
+                   buffer_size: int = 1024 * 1024) -> None:
         """Dump data(binary or text, stream or normal, async or not) to disk file.
         IO data will be closed.
         """
-        chunk: Optional[Union[AnyStr]] = None
+        chunk: Optional[AnyStr] = None
         if isinstance(data, str):
             file_mode = 'w'
         elif isinstance(data, bytes):
             file_mode = 'wb'
         elif hasattr(data, 'read'):  # readable
-            chunk = data.read(cls.streaming_buffer_size)
+            chunk = data.read(buffer_size)
             if asyncio.iscoroutine(chunk):
                 chunk = await chunk
 
@@ -241,7 +241,7 @@ class ItemBaseFileDumpPipeline(Pipeline):
                 await file.write(chunk)
                 while True:
 
-                    chunk = data.read(cls.streaming_buffer_size)
+                    chunk = data.read(buffer_size)
                     if asyncio.iscoroutine(chunk):
                         chunk = await chunk
 

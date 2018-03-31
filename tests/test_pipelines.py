@@ -76,11 +76,11 @@ async def test_item_base_file_dump_pipeline():
     await pl.dump('/dev/null', b'Hello World')
     await pl.dump('/dev/null', io.StringIO('Hello World'))
     await pl.dump('/dev/null', io.BytesIO(b'Hello World'))
-    await pl.dump('/dev/null', open('./tests/test.html'))
+    await pl.dump('/dev/null', open('./tests/test.html'), buffer_size=4)
     async with aiofiles.open('./tests/test.html') as f:
         await pl.dump('/dev/null', f)
     async with aiofiles.open('./tests/test.html', 'rb') as f:
-        await pl.dump('/dev/null', f)
+        await pl.dump('/dev/null', f, buffer_size=4)
 
     with pytest.raises(ValueError):
         await pl.dump('/dev/null', None)
@@ -149,9 +149,16 @@ async def test_item_email_pipeline():
 
             return FakeSMTP()
 
-    pl = TestPipeline('test', 'a@b.c', 'letmein', 'localhost', 25, recipients=['b@a.c', 'c@b.a'])
-    item = TItem(info='hi')
+    pl = TestPipeline('test', 'a@b.c', 'letmein', 'localhost', 25,
+                      recipients=['b@a.c', 'c@b.a'])
+    fsmtp = await pl.create_smtp()
 
+    await pl.send(fsmtp, 'test', 'test')
+    with open('./tests/test.html') as f:
+        await pl.send(fsmtp, 'test', 'test', attachments=[f])
+
+    # with item
+    item = TItem(info='hi')
     pl.process(item)
     await pl.on_spider_close()
 
@@ -163,7 +170,8 @@ async def test_item_mysql_pipeline():
     mysql_user = os.getenv('TEST_MYSQL_USER', 'root')
     mysql_password = os.getenv('TEST_MYSQL_PASSWORD', 'letmein')
 
-    bpl = ItemBaseMysqlPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
+    bpl = ItemBaseMysqlPipeline(host=mysql_server, port=mysql_port,
+                                user=mysql_user, password=mysql_password,
                                 database='mysql', table='')
     pool = await bpl.create_pool()
     await bpl.push_data('''DROP DATABASE IF EXISTS test;
@@ -196,7 +204,7 @@ async def test_item_mysql_pipeline():
     assert test_item is await ubpl.process(test_item)
     data = await ubpl.pull_data('SELECT * FROM test', ubpl.pool)
     assert test_item.test == data[0]['test']
-    test_item.test = 'I ant'
+    test_item.test = None
     assert test_item is await ubpl.process(test_item)
     data = await ubpl.pull_data('SELECT * FROM test', ubpl.pool)
     assert test_item.test == data[0]['test']

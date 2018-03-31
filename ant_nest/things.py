@@ -79,10 +79,13 @@ class CustomNoneType:
     pass
 
 
+_SHADOW_FIELD_NAME_PREFIX = '__field#'
+
+
 class IntField:
     _type = int
     storage_name = ''
-    __shadow_name_prefix = '__field#'
+    __shadow_name_prefix = _SHADOW_FIELD_NAME_PREFIX
 
     def __init__(self, null: bool = False, default: Any = CustomNoneType()):
         """
