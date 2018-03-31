@@ -109,13 +109,18 @@ def test_request_user_agent_pipeline():
     assert pl.process(req) is req
     assert req.headers['User-Agent'] == 'ant'
 
+    req.headers['User-Agent'] = 'custom'
+    assert pl.process(req).headers['User-Agent'] == 'custom'
+
 
 def test_request_random_user_agent_pipeline():
     pl = RequestRandomUserAgentPipeline()
-    req = Request('GET', URL('https://www.hi.com'), headers={'User-Agent': ''})
+    req = Request('GET', URL('https://www.hi.com'))
     assert pl.process(req) is req
-    assert req.headers['User-Agent'] != ''
-    assert pl.create() != pl.create()
+    assert req.headers.get('User-Agent') is not None
+
+    req.headers['User-Agent'] = 'custom'
+    assert pl.process(req).headers['User-Agent'] == 'custom'
 
     with pytest.raises(ValueError):
         RequestRandomUserAgentPipeline(system='something')
