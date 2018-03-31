@@ -12,8 +12,8 @@ destroy_test_env:
 	docker stop test_redis test_mariadb test_httpbin test_squid
 
 test:
-	python setup.py test --addopts='--cov=.'
 	flake8 ant_nest
+	python setup.py test --addopts='--cov ant_nest --cov-report term-missing'
 
 tag:
 	git tag $(version) -m "Release of version $(version)"

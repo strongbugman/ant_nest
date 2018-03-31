@@ -7,6 +7,7 @@ import pytest
 from ant_nest import *
 from ant_nest import CliAnt
 from ant_nest.cli import *
+from ant_nest.things import _SHADOW_FIELD_NAME_PREFIX
 
 
 def fake_response(content):
@@ -127,12 +128,17 @@ def test_item():
     assert dict(item.items()) == {'x': 10}
     assert item.x == 10
     item.a = '1.1'
-    with pytest.raises(FieldValidationError):  # raise because of "item.z" is not set
+    with pytest.raises(FieldValidationError):  # "item.z" is not set
         item.validate()
     item.z = '1'
     item.validate()
     assert item.a == 1.1
     assert item.z == 1
+
+
+def test_wrong_item():
+    with pytest.raises(AttributeError):
+        IntField.make_shadow_name(_SHADOW_FIELD_NAME_PREFIX)
 
 
 def test_extract():
@@ -208,7 +214,7 @@ def test_extract():
 
 
 def test_cli_get_ants():
-    ants = get_ants(['ant_nest'])
+    ants = get_ants(['ant_nest', 'tests'])
     assert CliAnt is list(ants.values())[0]
 
 
