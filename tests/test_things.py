@@ -7,6 +7,7 @@ import pytest
 from ant_nest import *
 from ant_nest import CliAnt
 from ant_nest.cli import *
+from ant_nest import cli
 from ant_nest.things import _SHADOW_FIELD_NAME_PREFIX
 
 
@@ -218,9 +219,27 @@ def test_cli_get_ants():
     assert CliAnt is list(ants.values())[0]
 
 
+def test_cli_shutdown():
+    ant = CliAnt()
+    ant.pool._queue.put_nowait(object())
+    cli.shutdown_ant(ant)
+    assert ant.pool._is_closed
+    assert ant.pool._queue.qsize() == 0
+
+    with pytest.raises(SystemExit):
+        cli.shutdown_ant(ant)
+
+
 def test_cli_run_ant():
     ant = CliAnt()
     asyncio.get_event_loop().run_until_complete(run_ant(ant))
+
+
+def test_cli():
+    with pytest.raises(SystemExit):
+        cli.main(['-v'])
+    with pytest.raises(SystemExit):
+        cli.main(['-l'])
 
 
 def test_cli_open_browser():
@@ -230,7 +249,9 @@ def test_cli_open_browser():
     def open_browser_function(url):
         return True
 
-    assert open_response_in_browser(res, _open_browser_function=open_browser_function)
+    assert open_response_in_browser(
+        res,
+        _open_browser_function=open_browser_function)
 
 
 def test_exception_filter():

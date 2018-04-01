@@ -83,13 +83,13 @@ def open_response_in_browser(
     return _open_browser_function('file://' + path)
 
 
-def main():
+def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--ant', help='ant name')
     parser.add_argument('-l', '--list', help='list ants', action='store_true')
     parser.add_argument('-v', '--version', help='get package version',
                         action='store_true')
-    args = parser.parse_args()
+    args = parser.parse_args(args)
     sys.path.append(os.getcwd())
 
     if args.version:
@@ -133,4 +133,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
