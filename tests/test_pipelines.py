@@ -2,6 +2,7 @@ import os
 import time
 from datetime import datetime
 import io
+from unittest import mock
 
 import pytest
 from yarl import URL
@@ -137,30 +138,38 @@ def test_request_random_user_agent_pipeline():
 @pytest.mark.asyncio
 async def test_item_email_pipeline():
 
-    class TestPipeline(ItemEmailPipeline):
-        async def create_smtp(self):
+    class FakeSMTP:
+        async def send_message(self, msg):
+            pass
 
-            class FakeSMTP:
-                async def send_message(self, msg):
-                    pass
+        async def connect(self, *args, **kwargs):
+            pass
 
-                def close(self):
-                    pass
+        async def starttls(self):
+            pass
 
-            return FakeSMTP()
+        async def login(self, *args, **kwargs):
+            pass
 
-    pl = TestPipeline('test', 'a@b.c', 'letmein', 'localhost', 25,
-                      recipients=['b@a.c', 'c@b.a'])
-    fsmtp = await pl.create_smtp()
+        def close(self):
+            pass
 
-    await pl.send(fsmtp, 'test', 'test')
-    with open('./tests/test.html') as f:
-        await pl.send(fsmtp, 'test', 'test', attachments=[f])
+    pl = ItemEmailPipeline('test', 'a@b.c', 'letmein', 'localhost', 25,
+                           recipients=['b@a.c', 'c@b.a'])
 
-    # with item
-    item = TItem(info='hi')
-    pl.process(item)
-    await pl.on_spider_close()
+    with mock.patch('aiosmtplib.SMTP', new=FakeSMTP):
+        fsmtp = await pl.create_smtp()
+        pl.starttls = True
+        fsmtp = await pl.create_smtp()
+
+        await pl.send(fsmtp, 'test', 'test')
+        with open('./tests/test.html') as f:
+            await pl.send(fsmtp, 'test', 'test', attachments=[f])
+
+        # with item
+        item = TItem(info='hi')
+        pl.process(item)
+        await pl.on_spider_close()
 
 
 @pytest.mark.asyncio
