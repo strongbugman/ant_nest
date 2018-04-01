@@ -128,9 +128,7 @@ def main(args):
         else:
             print('Can not find ant by the name "{:s}"'.format(ant_name))
             exit(-1)
-    else:
-        parser.print_help()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     main(sys.argv[1:])

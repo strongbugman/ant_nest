@@ -1,4 +1,5 @@
 import os
+import sys
 import asyncio
 
 from yarl import URL
@@ -236,10 +237,33 @@ def test_cli_run_ant():
 
 
 def test_cli():
+
     with pytest.raises(SystemExit):
         cli.main(['-v'])
-    with pytest.raises(SystemExit):
+
+    with pytest.raises(SystemExit):  # can`t settings.py
         cli.main(['-l'])
+
+    # mock settings.py import
+    sys.modules['settings'] = __import__('_settings_example')
+    import _settings_example as settings
+
+    settings.ANT_PACKAGES = ['NoAnts']
+    with pytest.raises(SystemExit):  # can`t import NoAnts
+        cli.main(['-l'])
+
+    settings.ANT_PACKAGES = ['ant_nest.things']
+    with pytest.raises(SystemExit):  # no ants can be found
+        cli.main(['-l'])
+
+    settings.ANT_PACKAGES = ['tests']
+    cli.main(['-l'])
+
+    with pytest.raises(SystemExit):  # FakeAnt not exist
+        cli.main(['-a' 'FakeAnt'])
+        cli.main(['-l'])
+
+    cli.main(['-a' 'tests.test_things.CliAnt'])  # run CliAnt
 
 
 def test_cli_open_browser():
