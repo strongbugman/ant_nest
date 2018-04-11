@@ -306,7 +306,7 @@ class ItemExtractor:
             extract_value = ''.join(extract_value)
         return extract_value
 
-    def extract(self, data: Any) -> Item:
+    def extract(self, data: Any) -> Any:
         """Extract item from response or other data by xpath,
         jpath or regex."""
         self.logger.debug('Extract item: {:s} with path: {:s}'.format(
