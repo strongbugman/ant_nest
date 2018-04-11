@@ -103,3 +103,5 @@ ENV/
 # OS and IDE
 .DS_Store
 .idea/
+
+.pytest_cache/
