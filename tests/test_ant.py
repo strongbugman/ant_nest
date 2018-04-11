@@ -304,7 +304,7 @@ async def test_with_real_request():
     assert res.status == 200
     # with stream
     ant.response_in_stream = True
-    res = await ant.request('http://httpbin.org/anything')
+    res = await ant.request(httpbin_base_url + 'anything')
     assert res.status == 200
     with pytest.raises(ValueError):
         res.simple_text
@@ -312,3 +312,8 @@ async def test_with_real_request():
         chunk = await res.content.read(10)
         if len(chunk) == 0:
             break
+    # set streaming by request
+    res = await ant.request(httpbin_base_url + 'anything',
+                            response_in_stream=False)
+    assert res.status == 200
+    assert res.simple_text is not None

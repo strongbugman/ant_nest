@@ -71,19 +71,25 @@ class Ant(abc.ABC):
                       data: Optional[Union[AnyStr, Dict, IO]] = None,
                       proxy: Optional[Union[str, URL]] = None,
                       timeout: Optional[Union[int, float]] = None,
-                      retries: Optional[int] = None
+                      retries: Optional[int] = None,
+                      response_in_stream: Optional[bool] = None
                       ) -> Response:
         if not isinstance(url, URL):
             url = URL(url)
         if proxy and not isinstance(proxy, URL):
             proxy = URL(proxy)
+        elif proxy is None:
+            proxy = self.get_proxy()
         if timeout is None:
             timeout = self.request_timeout
         if retries is None:
             retries = self.request_retries
+        if response_in_stream is None:
+            response_in_stream = self.response_in_stream
 
         req = self.request_cls(method, url, params=params, headers=headers,
-                               cookies=cookies, data=data, proxy=proxy)
+                               cookies=cookies, data=data, proxy=proxy,
+                               response_in_stream=response_in_stream)
         req = await self._handle_thing_with_pipelines(req,
                                                       self.request_pipelines,
                                                       timeout=timeout)
@@ -276,26 +282,24 @@ class Ant(abc.ABC):
         return thing
 
     async def _request(self, req: Request) -> Response:
-        if req.proxy is None:
-            proxy = self.get_proxy()
-        else:
-            proxy = req.proxy
+        proxy = req.proxy
         # cookies in headers, params in url
         kwargs = dict(method=req.method, url=req.url, headers=req.headers,
                       data=req.data)
-        kwargs['proxy'] = proxy
+        kwargs['proxy'] = req.proxy
         kwargs['max_redirects'] = self.request_max_redirects
         kwargs['allow_redirects'] = self.request_allow_redirects
 
         # proxy auth not work in one session with many requests,
         # add auth header to fix it
-        if proxy is not None:
-            if proxy.scheme == 'http' and proxy.user is not None:
+        if req.proxy is not None:
+            if req.proxy.scheme == 'http' and req.proxy.user is not None:
                 kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = \
                     aiohttp.BasicAuth.from_url(proxy).encode()
 
         response = await self._session._request(**kwargs)
-        if not self.response_in_stream:
+
+        if not req.response_in_stream:
             await response.read()
             response.close()
             await response.wait_for_close()

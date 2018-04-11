@@ -19,8 +19,9 @@ ConnectionKey = namedtuple('ConnectionKey',
 
 
 class Request(ClientRequest):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, response_in_stream: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
+        self.response_in_stream = response_in_stream
         # store data obj
         self.data: Union[AnyStr, dict, IO, None] = kwargs.get('data', None)
 
