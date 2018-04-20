@@ -1,6 +1,6 @@
 """Provide Ant`s Request, Response, Item and Extractor."""
 from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, \
-    DefaultDict, AnyStr, IO, Callable, Generator
+    DefaultDict, AnyStr, IO, Callable, Generator, TypeVar
 from collections.abc import MutableMapping
 import abc
 from collections import defaultdict, namedtuple
@@ -236,12 +236,15 @@ class Item(MutableMapping, metaclass=ItemMeta):
 Things = Union[Request, Response, Item]
 
 
+ExtractedItem = TypeVar('ExtractedItem')
+
+
 class ItemExtractor:
     extract_with_take_first = 'take_first'
     extract_with_join_all = 'join_all'
     extract_with_do_nothing = 'do_nothing'
 
-    def __init__(self, item_class: Type[Item]):
+    def __init__(self, item_class: Type[ExtractedItem]):
         self.item_class = item_class
         self.logger = logging.getLogger(self.__class__.__name__)
         self.paths: DefaultDict[str, List[Tuple[str, str, str]]] = \
@@ -307,7 +310,7 @@ class ItemExtractor:
             extract_value = ''.join(extract_value)
         return extract_value
 
-    def extract(self, data: Any) -> Any:
+    def extract(self, data: Any) -> ExtractedItem:
         """Extract item from response or other data by xpath,
         jpath or regex."""
         self.logger.debug('Extract item: {:s} with path: {:s}'.format(
@@ -335,7 +338,7 @@ class ItemExtractor:
 
 class ItemNestExtractor(ItemExtractor):
     def __init__(self, root_path_type: str, root_path: str,
-                 item_class: Type[Item]):
+                 item_class: Type[ExtractedItem]):
         self.root_path_type = root_path_type
         self.root_path = root_path
         super().__init__(item_class)
@@ -343,7 +346,8 @@ class ItemNestExtractor(ItemExtractor):
     def extract(self, response: Response):
         raise NotImplementedError('This method is dropped in this class')
 
-    def extract_items(self, response: Response) -> Generator[Item, None, None]:
+    def extract_items(self, response: Response
+                      ) -> Generator[ExtractedItem, None, None]:
         base_data = self.extract_value(
             self.root_path_type, self.root_path, response,
             extract_type=self.extract_with_do_nothing)
