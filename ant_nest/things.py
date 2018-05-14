@@ -1,6 +1,7 @@
 """Provide Ant`s Request, Response, Item and Extractor."""
 from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, \
     DefaultDict, AnyStr, IO, Callable, Generator, TypeVar
+from typing_extensions import Protocol
 from collections.abc import MutableMapping
 import abc
 from collections import defaultdict, namedtuple
@@ -19,11 +20,12 @@ ConnectionKey = namedtuple('ConnectionKey',
 
 
 class Request(ClientRequest):
-    def __init__(self, *args, response_in_stream: bool = False, **kwargs):
+    def __init__(self, *args, response_in_stream: bool = False,
+                 **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.response_in_stream = response_in_stream
         # store data obj
-        self.data: Union[AnyStr, dict, IO, None] = kwargs.get('data', None)
+        self.data: Optional[Union[AnyStr, dict, IO]] = kwargs.get('data', None)
 
     @property
     def connection_key(self):
@@ -83,12 +85,18 @@ class CustomNoneType:
 _SHADOW_FIELD_NAME_PREFIX = '__field#'
 
 
+class FieldType(Protocol):
+    def __init__(self, value: Any) -> None:
+        pass
+
+
 class IntField:
-    _type = int
+    _type: Type[FieldType] = int
     storage_name = ''
     __shadow_name_prefix = _SHADOW_FIELD_NAME_PREFIX
 
-    def __init__(self, null: bool = False, default: Any = CustomNoneType()):
+    def __init__(self, null: bool = False,
+                 default: Any = CustomNoneType()) -> None:
         """
         :param null, is True means this field can be ignore when value have
             not been set in validation,
@@ -153,8 +161,8 @@ _fields: DefaultDict[Type['Item'], Dict[str, IntField]] = defaultdict(dict)
 
 
 class ItemMeta(abc.ABCMeta):
-    def __init__(cls, name: str, bases: Tuple[type, ...],
-                 attr_dict: Dict[str, Any]):
+    def __init__(cls: Type['Item'], name: str, bases: Tuple[type, ...],
+                 attr_dict: Dict[str, Any]) -> None:
         super().__init__(name, bases, attr_dict)
         for k, v in attr_dict.items():
             if isinstance(v, IntField):
@@ -162,7 +170,7 @@ class ItemMeta(abc.ABCMeta):
                 v.storage_name = IntField.make_shadow_name(k)
         # fetch all fields from base class
         for base_cls in bases:
-            if base_cls in _fields:
+            if base_cls in _fields and issubclass(base_cls, Item):
                 # base item class`s fields must have been set
                 _fields[cls].update(_fields[base_cls])
 
@@ -244,7 +252,7 @@ class ItemExtractor:
     extract_with_join_all = 'join_all'
     extract_with_do_nothing = 'do_nothing'
 
-    def __init__(self, item_class: Type[ExtractedItem]):
+    def __init__(self, item_class: Type[ExtractedItem]) -> None:
         self.item_class = item_class
         self.logger = logging.getLogger(self.__class__.__name__)
         self.paths: DefaultDict[str, List[Tuple[str, str, str]]] = \
@@ -338,7 +346,7 @@ class ItemExtractor:
 
 class ItemNestExtractor(ItemExtractor):
     def __init__(self, root_path_type: str, root_path: str,
-                 item_class: Type[ExtractedItem]):
+                 item_class: Type[ExtractedItem]) -> None:
         self.root_path_type = root_path_type
         self.root_path = root_path
         super().__init__(item_class)
