@@ -8,6 +8,7 @@ env:
 before_install:
 - sudo /etc/init.d/mysql stop
 - make prepare_test_env
+- curl -v http://localhost:8080/
 install:
 - pip install codecov flake8
 script: make test
