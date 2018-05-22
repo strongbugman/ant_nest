@@ -9,17 +9,19 @@ import logging
 import re
 
 from aiohttp import ClientResponse, ClientRequest
+from aiohttp import __version__ as aiohttp_version
 from lxml import html
 import jpath
 import ujson
 
 from .exceptions import FieldValidationError, ItemExtractError
 
-ConnectionKey = namedtuple('ConnectionKey',
-                           ['host', 'port', 'ssl', 'proxy_host', 'proxy_port'])
-
 
 class Request(ClientRequest):
+
+    __ConnectionKey = namedtuple(
+        'ConnectionKey', ['host', 'port', 'ssl', 'proxy_host', 'proxy_port'])
+
     def __init__(self, *args, response_in_stream: bool = False,
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -29,14 +31,19 @@ class Request(ClientRequest):
 
     @property
     def connection_key(self):
-        if self.proxy is not None:
-            proxy_host = self.proxy.host
-            proxy_port = self.proxy.port
+        """
+        Be compatible with https://github.com/aio-libs/aiohttp/issues/2981"""
+        if aiohttp_version >= '3.2.1':
+            return super().connection_key
         else:
-            proxy_host = None
-            proxy_port = None
-        return ConnectionKey(self.host, self.port, self.is_ssl(), proxy_host,
-                             proxy_port)
+            if self.proxy is not None:
+                proxy_host = self.proxy.host
+                proxy_port = self.proxy.port
+            else:
+                proxy_host = None
+                proxy_port = None
+            return self.__ConnectionKey(
+                self.host, self.port, self.is_ssl(), proxy_host, proxy_port)
 
 
 class Response(ClientResponse):
