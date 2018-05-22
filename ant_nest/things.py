@@ -1,13 +1,13 @@
 """Provide Ant`s Request, Response, Item and Extractor."""
 from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, \
     DefaultDict, AnyStr, IO, Callable, Generator, TypeVar
-from typing_extensions import Protocol
 from collections.abc import MutableMapping
 import abc
 from collections import defaultdict, namedtuple
 import logging
 import re
 
+from typing_extensions import Protocol
 from aiohttp import ClientResponse, ClientRequest
 from aiohttp import __version__ as aiohttp_version
 from lxml import html

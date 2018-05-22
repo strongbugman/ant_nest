@@ -8,7 +8,7 @@ with open('ant_nest/__init__.py', 'rt', encoding='utf8') as f:
 requires = ['aiohttp>=2.3.2', 'lxml>=3.7.0',
             'aiomysql>=0.0.11', 'PyMySQL>=0.7.11', 'aioredis>=1.0.0',
             'jpath>=1.6', 'aiosmtplib>=1.0.2', 'tenacity>=4.8.0',
-            'ujson>=1.3.4', 'aiofiles>=0.3.1'
+            'ujson>=1.3.4', 'aiofiles>=0.3.1', 'typing_extensions>=3.6'
             ]
 tests_require = ['pytest>=3.3.1', 'pytest-asyncio>=0.8.0', 'pytest-cov>=2.5.1']
 setup_require = ['pytest-runner>=3.0']
