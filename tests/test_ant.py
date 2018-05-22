@@ -288,8 +288,6 @@ async def test_with_real_request():
     ant.request_max_redirects = 3
     res = await ant.request(httpbin_base_url + 'redirect/2')
     assert res.status == 200
-    res = await ant.request(httpbin_base_url + 'redirect/3')
-    assert res.status == 302
     # with http proxy
     proxy = os.getenv('TEST_HTTP_PROXY', 'http://bugman:letmein@localhost:3128')
     ant.request_proxies.append(proxy)
