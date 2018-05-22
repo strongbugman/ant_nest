@@ -13,9 +13,14 @@ from ant_nest.things import _SHADOW_FIELD_NAME_PREFIX
 
 
 def fake_response(content):
-    res = Response('GET', URL('http://test.com'), writer=None, continue100=None, timer=None,
-                   request_info=None, auto_decompress=None, traces=None, loop=asyncio.get_event_loop(),
-                   session=None)
+    try:
+        res = Response('GET', URL('http://test.com'), writer=None,
+                       continue100=None, timer=None,
+                       request_info=None, auto_decompress=None, traces=None,
+                       loop=asyncio.get_event_loop(),
+                       session=None)
+    except TypeError:
+        res = Response('GET', URL('http://test.com'))
     res._content = content
     res._body = content
 
@@ -39,6 +44,7 @@ def test_response():
         res.get_text()
     res = fake_response(b'1')
     res.get_encoding = lambda: 'utf-8'
+    res._get_encoding = lambda: 'utf-8'
     assert res.get_text() == '1'
 
 
