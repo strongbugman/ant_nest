@@ -43,7 +43,8 @@ class Request(ClientRequest):
                 proxy_host = None
                 proxy_port = None
             return self.__ConnectionKey(
-                self.host, self.port, self.is_ssl(), proxy_host, proxy_port)
+                self.host, self.port,
+                self.url.scheme in ('https', 'wss'), proxy_host, proxy_port)
 
 
 class Response(ClientResponse):
@@ -55,12 +56,21 @@ class Response(ClientResponse):
 
     def get_text(self, encoding: Optional[str] = None,
                  errors: str = 'strict') -> str:
-        if self._body is None:
+
+        if hasattr(self, '_body'):
+            body = self._body
+        else:
+            body = getattr(self, '_content')
+        if hasattr(self, 'get_encoding'):
+            get_encoding = self.get_encoding
+        else:
+            get_encoding = getattr(self, '_get_encoding')
+        if body is None:
             raise ValueError('Read stream first')
         if self._text is None:
             if encoding is None:
-                encoding = self.get_encoding()
-            self._text = self._body.decode(encoding, errors=errors)
+                encoding = get_encoding()
+            self._text = body.decode(encoding, errors=errors)
         return self._text
 
     @property
