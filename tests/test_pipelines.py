@@ -137,7 +137,6 @@ def test_request_random_user_agent_pipeline():
 
 @pytest.mark.asyncio
 async def test_item_email_pipeline():
-
     class FakeSMTP:
         async def send_message(self, msg):
             pass
@@ -181,59 +180,64 @@ async def test_item_mysql_pipeline():
 
     bpl = ItemBaseMysqlPipeline(host=mysql_server, port=mysql_port,
                                 user=mysql_user, password=mysql_password,
-                                database='mysql', table='')
-    pool = await bpl.create_pool()
+                                database='mysql', table='', buffer_length=1)
+    await bpl.on_spider_open()
     await bpl.push_data('''DROP DATABASE IF EXISTS test;
-                           CREATE DATABASE test;''', pool)
-    await bpl.push_data('''CREATE TABLE test.test (
-                           `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-                           `test` TEXT DEFAULT NULL,
-                           `test_bool` BOOL DEFAULT NULL,
-                           `test_int` INT DEFAULT NULL,
-                           `test_float` FLOAT DEFAULT NULL,
-                           `test_bytes` BLOB DEFAULT NULL,
-                           `test_datetime` DATETIME DEFAULT NULL,
-                           PRIMARY KEY (`id`)
-                           ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;''', pool)
+                           CREATE DATABASE test;''')
+    await bpl.push_data(
+        '''CREATE TABLE test.test (
+        `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+        `test` TEXT DEFAULT NULL,
+        `test_bool` BOOL DEFAULT NULL,
+        `test_int` INT DEFAULT NULL,
+        `test_float` FLOAT DEFAULT NULL,
+        `test_bytes` BLOB DEFAULT NULL,
+        `test_datetime` DATETIME DEFAULT NULL,
+        PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;''')
 
-    test_item = Item(test='I ant', test_bool=False, test_int=1, test_float=0.3, test_bytes=b'\xf0\x9f\x91\x8d',
+    test_item = Item(test='I ant', test_bool=False, test_int=1, test_float=0.3,
+                     test_bytes=b'\xf0\x9f\x91\x8d',
                      test_datetime=datetime.now())
-    ibpl = ItemMysqlInsertPipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
-                                   database='test', table='test')
+    ibpl = ItemMysqlInsertPipeline(host=mysql_server, port=mysql_port,
+                                   user=mysql_user, password=mysql_password,
+                                   database='test', table='test',
+                                   buffer_length=1)
     await ibpl.on_spider_open()
     assert test_item is await ibpl.process(test_item)
-    data = await ibpl.pull_data('SELECT * FROM test', ibpl.pool)
+    data = await ibpl.pull_data('SELECT * FROM test')
     assert test_item.test == data[0]['test']
 
-    ubpl = ItemMysqlUpdatePipeline(host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
-                                   database='test', table='test', primary_key='id')
+    ubpl = ItemMysqlUpdatePipeline(host=mysql_server, port=mysql_port,
+                                   user=mysql_user, password=mysql_password,
+                                   database='test', table='test',
+                                   primary_key='id', buffer_length=1)
     await ubpl.on_spider_open()
     test_item.id = data[0]['id']
     test_item.test = 'I ANT'
     assert test_item is await ubpl.process(test_item)
-    data = await ubpl.pull_data('SELECT * FROM test', ubpl.pool)
+    data = await ubpl.pull_data('SELECT * FROM test')
     assert test_item.test == data[0]['test']
     test_item.test = None
     assert test_item is await ubpl.process(test_item)
-    data = await ubpl.pull_data('SELECT * FROM test', ubpl.pool)
+    data = await ubpl.pull_data('SELECT * FROM test')
     assert test_item.test == data[0]['test']
 
     iubpl = ItemMysqlInsertUpdatePipeline(
         ['test'],
-        host=mysql_server, port=mysql_port, user=mysql_user, password=mysql_password,
-        database='test', table='test')
+        host=mysql_server, port=mysql_port, user=mysql_user,
+        password=mysql_password,
+        database='test', table='test', buffer_length=1)
     await iubpl.on_spider_open()
     test_item.test = 'I love ant!'
     assert test_item is await iubpl.process(test_item)
-    data = await iubpl.pull_data('SELECT * FROM test', iubpl.pool)
+    data = await iubpl.pull_data('SELECT * FROM test')
     assert test_item.test == data[0]['test']
 
     await ubpl.on_spider_close()
     await ibpl.on_spider_close()
     await iubpl.on_spider_close()
-    await bpl.push_data('DROP TABLE test.test;DROP DATABASE test', pool)
-    pool.close()
-    await pool.wait_closed()
+    await bpl.push_data('DROP TABLE test.test;DROP DATABASE test')
 
 
 @pytest.mark.asyncio
