@@ -279,7 +279,7 @@ class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
 class ItemBaseMysqlPipeline(Pipeline):
     def __init__(self, host: str, port: int, user: str, password: str,
                  database: str, table: str,
-                 charset: str = 'utf8'):
+                 charset: str = 'utf8', buffer_length: int = 100):
         super().__init__()
         self.host = host
         self.port = port
@@ -288,6 +288,20 @@ class ItemBaseMysqlPipeline(Pipeline):
         self.database = database
         self.table = table
         self.charset = charset
+        # writing buffer
+        self.buffer: List[str] = []
+        self.buffer_length = buffer_length
+        self.pool: Optional[aiomysql.Pool] = None
+
+    async def on_spider_open(self) -> None:
+        self.pool = await self.create_pool()
+
+    async def on_spider_close(self):
+        if len(self.buffer) > 0:
+            self.buffer_length = 1
+            await self.push_data('')
+        self.pool.close()
+        await self.pool.wait_closed()
 
     async def create_pool(self) -> aiomysql.Pool:
         return await aiomysql.create_pool(host=self.host, port=self.port,
@@ -297,19 +311,27 @@ class ItemBaseMysqlPipeline(Pipeline):
                                           charset=self.charset,
                                           use_unicode=True)
 
-    async def push_data(self, sql: str, pool: aiomysql.Pool) -> None:
+    async def push_data(self, sql: str) -> None:
         """Run SQL without pulling data like "INSERT" and "UPDATE" command"""
-        self.logger.debug('Executing SQL: ' + sql)
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql)
-            await conn.commit()
+        if self.pool is None:
+            raise RuntimeError('Need connection pool!')
 
-    async def pull_data(self, sql: str, pool: aiomysql.Pool
-                        ) -> Tuple[Dict[str, Any]]:
-        """Run SQL with pulling data like "SELECT" command"""
         self.logger.debug('Executing SQL: ' + sql)
-        async with pool.acquire() as conn:
+        self.buffer.append(sql)
+        if len(self.buffer) >= self.buffer_length:
+            async with self.pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(';'.join(self.buffer))
+                await conn.commit()
+            self.buffer.clear()
+
+    async def pull_data(self, sql: str) -> Tuple[Dict[str, Any]]:
+        """Run SQL with pulling data like "SELECT" command"""
+        if self.pool is None:
+            raise RuntimeError('Need connection pool!')
+
+        self.logger.debug('Executing SQL: ' + sql)
+        async with self.pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cur:
                 await cur.execute(sql)
                 return await cur.fetchall()
@@ -334,17 +356,6 @@ class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
     sql_format = 'INSERT IGNORE INTO `{database}`.`{table}` ({fields}) ' \
                  'VALUES ({values})'
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.pool = None
-
-    async def on_spider_open(self) -> None:
-        self.pool = await self.create_pool()
-
-    async def on_spider_close(self) -> None:
-        self.pool.close()
-        await self.pool.wait_closed()
-
     async def process(self, thing: Item) -> Item:
         fields = []
         values = []
@@ -354,7 +365,7 @@ class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
         sql = self.sql_format.format(database=self.database, table=self.table,
                                      fields='`' + '`,`'.join(fields) + '`',
                                      values=','.join(values))
-        await self.push_data(sql, self.pool)
+        await self.push_data(sql)
         return thing
 
 
@@ -362,11 +373,8 @@ class ItemMysqlUpdatePipeline(ItemMysqlInsertPipeline):
     sql_format = 'UPDATE `{database}`.`{table}` SET {pairs} WHERE ' \
                  '`{primary_key}`={primary_value}'
 
-    def __init__(self, primary_key: str, host: str, port: int, user: str,
-                 password: str, database: str, table: str,
-                 charset: str = 'utf8'):
-        super().__init__(host, port, user, password, database, table,
-                         charset=charset)
+    def __init__(self, primary_key: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.primary_key = primary_key
 
     async def process(self, thing: Item) -> Item:
@@ -386,7 +394,7 @@ class ItemMysqlUpdatePipeline(ItemMysqlInsertPipeline):
                                          pairs=','.join(pairs),
                                          primary_key=self.primary_key,
                                          primary_value=primary_value)
-            await self.push_data(sql, self.pool)
+            await self.push_data(sql)
         return thing
 
 
@@ -412,7 +420,7 @@ class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
                                      fields='`' + '`,`'.join(fields) + '`',
                                      values=','.join(values),
                                      pairs=','.join(pairs))
-        await self.push_data(sql, self.pool)
+        await self.push_data(sql)
         return thing
 
 
