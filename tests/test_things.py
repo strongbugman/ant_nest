@@ -1,6 +1,7 @@
 import os
 import sys
 import asyncio
+from unittest import mock
 
 from yarl import URL
 import pytest
@@ -247,12 +248,12 @@ def test_cli():
     with pytest.raises(SystemExit):
         cli.main(['-v'])
 
-    with pytest.raises(SystemExit):  # can`t settings.py
+    with pytest.raises(SystemExit):  # no settings.py
         cli.main(['-l'])
 
+    from ant_nest import _settings_example as settings
     # mock settings.py import
-    sys.modules['settings'] = __import__('_settings_example')
-    import _settings_example as settings
+    sys.modules['settings'] = settings
 
     settings.ANT_PACKAGES = ['NoAnts']
     with pytest.raises(SystemExit):  # can`t import NoAnts
@@ -269,7 +270,10 @@ def test_cli():
         cli.main(['-a' 'FakeAnt'])
         cli.main(['-l'])
 
-    cli.main(['-a' 'tests.test_things.CliAnt'])  # run CliAnt
+    with pytest.raises(SystemExit), mock.patch('os.mkdir', lambda x: None):
+        cli.main(['-c' '.'])
+
+    cli.main(['-a' 'tests.test_things.CliAnt'])
 
 
 def test_cli_open_browser():
