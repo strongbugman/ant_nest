@@ -4,6 +4,7 @@ import argparse
 import inspect
 import os
 import sys
+import shutil
 import asyncio
 from importlib import import_module
 from pkgutil import iter_modules
@@ -16,7 +17,7 @@ from asyncio.queues import QueueEmpty
 
 from .ant import Ant
 from .things import Response
-from . import __version__
+from . import __version__, _settings_example
 
 __all__ = ['get_ants', 'run_ant', 'open_response_in_browser']
 
@@ -65,7 +66,7 @@ def shutdown_ant(ant: Ant):
     print('Graceful shutdown {:s}...Try again to force '
           'shutdown'.format(ant.name))
 
-    # drop waiting coroutines in coroutines pool
+    # drop waiting coroutines
     ant.pool._is_closed = True
     while True:
         try:
@@ -83,19 +84,29 @@ def open_response_in_browser(
     return _open_browser_function('file://' + path)
 
 
-def main():
+def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--ant', help='ant name')
     parser.add_argument('-l', '--list', help='list ants', action='store_true')
     parser.add_argument('-v', '--version', help='get package version',
                         action='store_true')
-    args = parser.parse_args()
+    parser.add_argument('-c', '--project', help='project name')
+    args = parser.parse_args(args)
     sys.path.append(os.getcwd())
 
     if args.version:
         print(__version__)
         exit()
-
+    elif args.project:
+        try:
+            os.mkdir(args.project)
+        except FileExistsError:
+            pass
+        os.mkdir(os.path.join(args.project, 'ants'))
+        shutil.copyfile(_settings_example.__file__,
+                        os.path.join(args.project, 'settings.py'))
+        exit()
+    # in one project
     try:
         import settings
     except ImportError as e:
