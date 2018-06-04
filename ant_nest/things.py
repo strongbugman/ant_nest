@@ -3,13 +3,12 @@ from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, \
     DefaultDict, AnyStr, IO, Callable, Generator, TypeVar
 from collections.abc import MutableMapping
 import abc
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 import logging
 import re
 
 from typing_extensions import Protocol
 from aiohttp import ClientResponse, ClientRequest
-from aiohttp import __version__ as aiohttp_version
 from lxml import html
 import jpath
 import ujson
@@ -18,33 +17,12 @@ from .exceptions import FieldValidationError, ItemExtractError
 
 
 class Request(ClientRequest):
-
-    __ConnectionKey = namedtuple(
-        'ConnectionKey', ['host', 'port', 'ssl', 'proxy_host', 'proxy_port'])
-
     def __init__(self, *args, response_in_stream: bool = False,
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.response_in_stream = response_in_stream
         # store data obj
         self.data: Optional[Union[AnyStr, dict, IO]] = kwargs.get('data', None)
-
-    @property
-    def connection_key(self):
-        """
-        Be compatible with https://github.com/aio-libs/aiohttp/issues/2981"""
-        if aiohttp_version >= '3.2.1':
-            return super().connection_key
-        else:
-            if self.proxy is not None:
-                proxy_host = self.proxy.host
-                proxy_port = self.proxy.port
-            else:
-                proxy_host = None
-                proxy_port = None
-            return self.__ConnectionKey(
-                self.host, self.port,
-                self.url.scheme in ('https', 'wss'), proxy_host, proxy_port)
 
 
 class Response(ClientResponse):
@@ -57,20 +35,12 @@ class Response(ClientResponse):
     def get_text(self, encoding: Optional[str] = None,
                  errors: str = 'strict') -> str:
 
-        if hasattr(self, '_body'):
-            body = self._body
-        else:
-            body = getattr(self, '_content')
-        if hasattr(self, 'get_encoding'):
-            get_encoding = self.get_encoding
-        else:
-            get_encoding = getattr(self, '_get_encoding')
-        if body is None:
+        if self._body is None:
             raise ValueError('Read stream first')
         if self._text is None:
             if encoding is None:
-                encoding = get_encoding()
-            self._text = body.decode(encoding, errors=errors)
+                encoding = self.get_encoding()
+            self._text = self._body.decode(encoding, errors=errors)
         return self._text
 
     @property
