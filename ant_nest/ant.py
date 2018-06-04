@@ -32,7 +32,7 @@ class Ant(abc.ABC):
     item_pipelines: List[Pipeline] = []
     request_cls = Request
     response_cls = Response
-    request_timeout = DEFAULT_TIMEOUT
+    request_timeout = DEFAULT_TIMEOUT.total
     request_retries = 3
     request_retry_delay = 5
     request_proxies: List[Union[str, URL]] = []
@@ -42,7 +42,7 @@ class Ant(abc.ABC):
     connection_limit = 100  # see "TCPConnector" in "aiohttp"
     connection_limit_per_host = 0
     pool_limit = 100
-    pool_timeout = DEFAULT_TIMEOUT
+    pool_timeout = DEFAULT_TIMEOUT.total
     pool_raise_exception = False
 
     def __init__(self):
@@ -258,9 +258,9 @@ class Ant(abc.ABC):
         except IndexError:
             return None
 
-    async def _handle_thing_with_pipelines(self, thing: Things,
-                                           pipelines: List[Pipeline],
-                                           timeout=DEFAULT_TIMEOUT) -> Things:
+    async def _handle_thing_with_pipelines(
+            self, thing: Things, pipelines: List[Pipeline],
+            timeout=DEFAULT_TIMEOUT.total) -> Things:
         """Process thing one by one, break the process chain when get
         exception.
 
