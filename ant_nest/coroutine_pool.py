@@ -10,28 +10,6 @@ from itertools import islice
 import async_timeout
 
 
-def timeout_wrapper(
-        coro_or_func: typing.Union[typing.Coroutine, typing.Callable],
-        timeout: typing.Union[float, int]
-        ) -> typing.Union[typing.Coroutine, typing.Callable]:
-    """Add timeout limit to coroutine or coroutine function"""
-    is_coroutinefunction = asyncio.iscoroutinefunction(coro_or_func)
-
-    async def wrapper(*args, **kwargs):
-        with async_timeout.timeout(timeout):
-            if is_coroutinefunction:
-                return await coro_or_func(*args, **kwargs)
-            else:
-                return await coro_or_func
-
-    if timeout < 0:
-        return coro_or_func
-    elif is_coroutinefunction:
-        return wrapper
-    else:
-        return wrapper()
-
-
 class CoroutinesPool:
     """
     Coroutines concurrent execute pool with API like standard
@@ -39,16 +17,13 @@ class CoroutinesPool:
     """
 
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None,
-                 raise_exception: bool = True,
-                 limit: int = -1, timeout: typing.Union[int, float] = -1):
+                 raise_exception: bool = True, limit: int = -1):
         """
         :param loop: set to "asyncio.get_event_loop()" by default.
         :param raise_exception: raise coroutine`s exception inside
             (handle by asyncio) or just log it by logging
         :param limit: concurrency coroutines`s count limit,
             no limit by default.
-        :param timeout: global timeout for single one coroutine, no timeout
-            by default.
         """
 
         if loop is None:
@@ -56,7 +31,6 @@ class CoroutinesPool:
         else:
             self._loop = loop
 
-        self._timeout = timeout
         self._limit = limit
         self._raise_exception = raise_exception
         self._queue = Queue(
@@ -69,10 +43,6 @@ class CoroutinesPool:
     @property
     def loop(self):
         return self._loop
-
-    @property
-    def timeout(self) -> typing.Union[int, float]:
-        return self._timeout
 
     @property
     def limit(self) -> int:
@@ -101,29 +71,21 @@ class CoroutinesPool:
         return status
 
     def reset(self, limit: typing.Optional[int] = None,
-              timeout: typing.Union[int, float, None] = None,
               raise_exception: typing.Optional[bool] = None):
         """Rest limit or timeout or raise_exception,
         it`s safe to call anytime
         """
         self._limit = self._limit if limit is None else limit
-        self._timeout = self._timeout if timeout is None else timeout
         if raise_exception is not None:
             self._raise_exception = raise_exception
 
-    def schedule_coroutine(self, coroutine: typing.Coroutine,
-                           timeout: typing.Union[
-                               float, int, None] = None) -> None:
+    def schedule_coroutine(self, coroutine: typing.Coroutine) -> None:
         """Like "asyncio.ensure_future", it schedule coroutine in event loop
         and return immediately.
 
         Call "self.wait_scheduled_coroutines" make sure all coroutine has been
         done.
-
-        :param timeout: set to "self._timeout" by default
         """
-        timeout = self._timeout if timeout is None else timeout
-
         def _done_callback(f):
             self._running_count -= 1
             self._done_queue.put_nowait(f)
@@ -154,21 +116,16 @@ class CoroutinesPool:
         if self._limit == -1 or self._running_count < self._limit:
             self._running_count += 1
             asyncio.ensure_future(
-                timeout_wrapper(coroutine, timeout=timeout),
-                loop=self._loop).add_done_callback(_done_callback)
+                coroutine, loop=self._loop).add_done_callback(_done_callback)
         else:
-            self._queue.put_nowait(timeout_wrapper(coroutine, timeout=timeout))
+            self._queue.put_nowait(coroutine)
 
-    def schedule_coroutines(self,
-                            coroutines: typing.Iterable[typing.Coroutine],
-                            timeout: typing.Union[
-                                float, int, None] = None) -> None:
+    def schedule_coroutines(
+            self, coroutines: typing.Iterable[typing.Coroutine]) -> None:
         """A short way to schedule many coroutines.
-
-        :param timeout: set to "self._timeout" by default
         """
         for coroutine in coroutines:
-            self.schedule_coroutine(coroutine, timeout=timeout)
+            self.schedule_coroutine(coroutine)
 
     async def wait_scheduled_coroutines(self):
         """Wait scheduled coroutines to be done, can be called many times.
@@ -177,18 +134,15 @@ class CoroutinesPool:
             await self._done_queue.get()
 
     def as_completed(self, coroutines: typing.Iterable[typing.Coroutine],
-                     limit: typing.Optional[int] = None,
-                     timeout: typing.Union[int, float, None] = None
+                     limit: typing.Optional[int] = None
                      ) -> typing.Generator[typing.Coroutine, None, None]:
         """Like "asyncio.as_completed",
         run and iter coroutines out of the pool.
 
-        :param timeout: set to "self._timeout" by default
         :param limit: set to "self._limit" by default, this "limit" is not
             shared with pool`s limit
         """
         limit = self._limit if limit is None else limit
-        timeout = self._timeout if timeout is None else timeout
 
         coroutines = iter(coroutines)
         queue = Queue(loop=self._loop)
@@ -210,14 +164,10 @@ class CoroutinesPool:
 
         if limit <= 0:
             fs = {asyncio.ensure_future(
-                timeout_wrapper(cor, timeout=timeout),
-                loop=self._loop
-            ) for cor in coroutines}
+                cor, loop=self._loop) for cor in coroutines}
         else:
             fs = {asyncio.ensure_future(
-                timeout_wrapper(cor, timeout=timeout),
-                loop=self._loop
-            ) for cor in islice(coroutines, 0, limit)}
+                cor, loop=self._loop) for cor in islice(coroutines, 0, limit)}
         for f in fs:
             f.add_done_callback(_done_callback)
             todo.append(f)
@@ -228,21 +178,16 @@ class CoroutinesPool:
     async def as_completed_with_async(
             self, coroutines: typing.Iterable[typing.Coroutine],
             limit: typing.Optional[int] = None,
-            timeout: typing.Union[int, float, None] = None,
             raise_exception: typing.Optional[bool] = None,
     ) -> typing.AsyncGenerator[typing.Any, None]:
         """as_completed`s async version, can catch and log exception inside.
 
-        :param timeout: set to "self._timeout" by default
-        :param limit: set to "self._limit" by default, this "limit" is not
-            shared with pool`s limit
         :param raise_exception: set to "self._raise_exception" by default
         """
         if raise_exception is None:
             raise_exception = self._raise_exception
 
-        for coro in self.as_completed(coroutines, limit=limit,
-                                      timeout=timeout):
+        for coro in self.as_completed(coroutines, limit=limit):
             try:
                 yield await coro
             except Exception as e:

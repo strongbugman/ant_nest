@@ -11,7 +11,6 @@ from collections import defaultdict
 import aiohttp
 from aiohttp.client import DEFAULT_TIMEOUT
 from aiohttp import ClientSession
-import async_timeout
 from yarl import URL
 from tenacity import retry
 from tenacity.retry import retry_if_result, retry_if_exception_type
@@ -20,7 +19,7 @@ from tenacity.stop import stop_after_attempt
 
 from .pipelines import Pipeline
 from .things import Request, Response, Item, Things
-from .coroutine_pool import CoroutinesPool, timeout_wrapper
+from .coroutine_pool import CoroutinesPool
 from .exceptions import ThingDropped
 
 __all__ = ['Ant']
@@ -42,7 +41,6 @@ class Ant(abc.ABC):
     connection_limit = 100  # see "TCPConnector" in "aiohttp"
     connection_limit_per_host = 0
     pool_limit = 100
-    pool_timeout = DEFAULT_TIMEOUT.total
     pool_raise_exception = False
 
     def __init__(self):
@@ -56,9 +54,8 @@ class Ant(abc.ABC):
         self._last_time = self._start_time
         self._report_slot = 60  # report once after one minute by default
         self._session: aiohttp.ClientSession = self.make_session()
-        self.pool = CoroutinesPool(limit=self.pool_limit,
-                                   timeout=self.pool_timeout,
-                                   raise_exception=self.pool_raise_exception)
+        self.pool = CoroutinesPool(
+            limit=self.pool_limit, raise_exception=self.pool_raise_exception)
 
     @property
     def name(self):
@@ -87,25 +84,22 @@ class Ant(abc.ABC):
         if response_in_stream is None:
             response_in_stream = self.response_in_stream
 
-        req = self.request_cls(method, url, params=params, headers=headers,
-                               cookies=cookies, data=data, proxy=proxy,
+        req = self.request_cls(method, url, timeout=timeout, params=params,
+                               headers=headers, cookies=cookies, data=data,
+                               proxy=proxy,
                                response_in_stream=response_in_stream)
-        req = await self._handle_thing_with_pipelines(req,
-                                                      self.request_pipelines,
-                                                      timeout=timeout)
+        req = await self._handle_thing_with_pipelines(
+            req, self.request_pipelines)
         self.report(req)
 
-        request_function = timeout_wrapper(self._request, timeout=timeout)
         if retries > 0:
-            res = await self.make_retry_decorator(retries,
-                                                  self.request_retry_delay)(
-                request_function)(req)
+            res = await self.make_retry_decorator(
+                retries, self.request_retry_delay)(self._request)(req)
         else:
-            res = await request_function(req)
+            res = await self._request(req)
 
-        res = await self._handle_thing_with_pipelines(res,
-                                                      self.response_pipelines,
-                                                      timeout=timeout)
+        res = await self._handle_thing_with_pipelines(
+            res, self.response_pipelines)
         self.report(res)
         return res
 
@@ -259,8 +253,7 @@ class Ant(abc.ABC):
             return None
 
     async def _handle_thing_with_pipelines(
-            self, thing: Things, pipelines: List[Pipeline],
-            timeout=DEFAULT_TIMEOUT.total) -> Things:
+            self, thing: Things, pipelines: List[Pipeline]) -> Things:
         """Process thing one by one, break the process chain when get
         exception.
 
@@ -269,12 +262,9 @@ class Ant(abc.ABC):
         raw_thing = thing
         for pipeline in pipelines:
             try:
-                # TODO: timeout limit?
-                # See https://github.com/glenfant/stopit#id15
                 thing = pipeline.process(thing)
                 if asyncio.iscoroutine(thing):
-                    with async_timeout.timeout(timeout):
-                        thing = await thing
+                    thing = await thing
             except Exception as e:
                 if isinstance(e, ThingDropped):
                     self.report(raw_thing, dropped=True)
