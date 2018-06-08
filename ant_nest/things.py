@@ -8,7 +8,7 @@ import logging
 import re
 
 from typing_extensions import Protocol
-from aiohttp import ClientResponse, ClientRequest
+from aiohttp import ClientResponse, ClientRequest, sentinel
 from lxml import html
 import jpath
 import ujson
@@ -17,10 +17,11 @@ from .exceptions import FieldValidationError, ItemExtractError
 
 
 class Request(ClientRequest):
-    def __init__(self, *args, response_in_stream: bool = False,
-                 **kwargs) -> None:
+    def __init__(self, *args, timeout: float = sentinel,
+                 response_in_stream: bool = False, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.response_in_stream = response_in_stream
+        self.timeout = timeout
         # store data obj
         self.data: Optional[Union[AnyStr, dict, IO]] = kwargs.get('data', None)
 
