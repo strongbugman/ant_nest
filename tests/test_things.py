@@ -10,7 +10,6 @@ from ant_nest import *
 from ant_nest import CliAnt
 from ant_nest.cli import *
 from ant_nest import cli
-from ant_nest.things import _SHADOW_FIELD_NAME_PREFIX
 
 
 def fake_response(content):
@@ -46,139 +45,33 @@ def test_response():
     assert res.get_text() == '1'
 
 
-def test_field():
-    name = 'test'
-    name = IntField.make_shadow_name(name)
-    assert IntField.is_shadow_name(name)
-    assert IntField.get_name_from_shadow(name) == 'test'
-
-
-def test_item():
-
-    class TestItem(Item):
-        t1 = IntField()
-        t2 = FloatField()
-
-    item = TestItem()
-
-    assert len(item) == 0
-
-    # set by attribute
-    item.t1 = '1'
-    item.t2 = '0.333'
-    assert item.t1 == '1'
-    item.validate()
-    assert item.t1 == 1
-    assert item.t2 == 0.333
-    # set by key name
-    item['t1'] = '2'
-    item.validate()
-    assert item['t1'] == item.t1
-    assert item.get('t1') == 2
-    assert item.get('t2') == 0.333
-    assert set(item.keys()) == {'t1', 't2'}
-    assert set(item.values()) == {2, 0.333}
-    assert dict(item.items()) == {'t1': 2, 't2': 0.333}
-    # validate
-    with pytest.raises(FieldValidationError):
-        item.t1 = '1s'
-        item.validate()
-    # delete
-    item.t3 = 3
-    assert item['t3'] == 3
-    del item['t3']
-    # pop
-    assert item.pop('t1') == '1s'
-    del item['t2']
-    with pytest.raises(AttributeError):
-        item.t1
-    with pytest.raises(KeyError):
-        item.__delitem__('t2')
-    assert item.get('t1') is None
-    # set with exception
-    with pytest.raises(KeyError):
-        item[1] = 2
-    with pytest.raises(AttributeError):
-        item.__setattr__(2, 2)
-    item.t1 = 3
-    del item.t1
-    with pytest.raises(AttributeError):
-        item.t1
-    # "default" and "null" kwargs
-
-    class TestItem(Item):
-        x = IntField(default=10)
-        y = StringField(null=True)
-        z = IntField()
-
-    item = TestItem()
-    assert dict(item.items()) == {'x': 10}
-    assert item.x == 10
-    with pytest.raises(FieldValidationError):
-        item.validate()
-    item.z = 1
-    item.validate()
-    # init with kwargs
-    item = TestItem(z=10, a=1)
-    assert item.z == 10
-    assert item.a == 1
-    # repr and str
-    item.__repr__()
-    item.__str__()
-    # subclass
-
-    class SubItem(TestItem):
-        a = FloatField()
-
-    item = SubItem()
-    assert dict(item.items()) == {'x': 10}
-    assert item.x == 10
-    item.a = '1.1'
-    with pytest.raises(FieldValidationError):  # "item.z" is not set
-        item.validate()
-    item.z = '1'
-    item.validate()
-    assert item.a == 1.1
-    assert item.z == 1
-
-
-def test_wrong_item():
-    with pytest.raises(AttributeError):
-        IntField.make_shadow_name(_SHADOW_FIELD_NAME_PREFIX)
-
-
 def test_extract():
-    class TestItem(Item):
-        paragraph = StringField()
-        title = StringField()
-
-    request = Request('GET', URL('https://www.python.org/'))
     with open('./tests/test.html', 'rb') as f:
         response = fake_response(f.read())
         response.get_text(encoding='utf-8')
+
+    class Item:
+        pass
     # extract item with xpath and regex
-    item_extractor = ItemExtractor(TestItem)
+    item_extractor = ItemExtractor(Item)
     item_extractor.add_xpath('paragraph', '/html/body/div/p/text()')
-    item_extractor.add_regex('title', '<title>([A-Z a-z]+)</title>', item_extractor.extract_with_join_all)
+    item_extractor.add_regex('title', '<title>([A-Z a-z]+)</title>',
+                             item_extractor.extract_with_join_all)
     item = item_extractor.extract(response)
     assert item.paragraph == 'test'
     assert item.title == 'Test html'
     # some exception will be ignored
     item_extractor.add_regex('test', 'test(\d+)test')
     item = item_extractor.extract(response)
-    assert 'test' not in item  # "test" key`s value can`t be find
+    assert getattr(item, 'test', None) is None
     # with exception for multiple result
     item_extractor.add_xpath('paragraph', '/html/head/title/text()')
     with pytest.raises(ItemExtractError):
         item = item_extractor.extract(response)
     # extract with jpath
-
-    class TestItem(Item):
-        author = StringField()
-
     response = fake_response(b'{"a": {"b": {"c": 1}}, "d": null}')
     response.get_text(encoding='utf-8')
-    item_extractor = ItemExtractor(TestItem)
+    item_extractor = ItemExtractor(Item)
     item_extractor.add_jpath('author', 'a.b.c')
     item_extractor.add_jpath('freedom', 'd')
     item = item_extractor.extract(response)

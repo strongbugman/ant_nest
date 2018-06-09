@@ -27,7 +27,7 @@ async def test_ant():
 
         async def run(self):
             await self.request('http://test.com')
-            await self.collect(Item(x=1))
+            await self.collect(object())
             assert self.item_pipelines[0].count == 1
 
         async def _request(self, req: Request):
@@ -124,7 +124,7 @@ async def test_pipelines():
             return None
 
     pls = [Pipeline() for x in range(10)]
-    thing = Item(x=1)
+    thing = object()
     ant = TestAnt()
     assert thing is await ant._handle_thing_with_pipelines(thing, pls)
     # with exception
@@ -199,9 +199,6 @@ async def test_with_real_request():
             assert res.simple_json['method'] == method
         else:
             assert res.simple_text == ''
-    # timeout
-    with pytest.raises(asyncio.TimeoutError):
-        await ant.request('http://httpbin.org', timeout=0.00001, retries=0)
     # params
     res = await ant.request(httpbin_base_url + 'get?k1=v1&k2=v2')
     assert res.status == 200

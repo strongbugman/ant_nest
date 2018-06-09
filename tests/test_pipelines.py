@@ -37,34 +37,17 @@ def test_request_duplicate_filter_pipeline():
         pl.process(req)
 
 
-class TItem(Item):
-    count = IntField()
-    info = StringField()
-
-
-def test_item_print_pipeline():
+def test_item_print_pipeline(item_cls):
     pl = ItemPrintPipeline()
-    item = TItem()
+    item = item_cls()
     item.count = 3
     item.info = 'hi'
     assert pl.process(item) is item
 
 
-def test_item_validate_pipeline():
-    pl = ItemValidatePipeline()
-    item = TItem()
-    item.count = '3'
-    with pytest.raises(ThingDropped):
-        pl.process(item)
-
-    item.info = 'hi'
-    pl.process(item)
-    assert item.count == 3
-
-
-def test_item_filed_replace_pipeline():
+def test_item_filed_replace_pipeline(item_cls):
     pl = ItemFieldReplacePipeline(['info'])
-    item = TItem()
+    item = item_cls()
     item.info = 'hi\n,\t\r ant\n'
     pl.process(item)
     assert item.info == 'hi, ant'
@@ -88,12 +71,12 @@ async def test_item_base_file_dump_pipeline():
 
 
 @pytest.mark.asyncio
-async def test_item_json_dump_pipeline():
-    pl = ItemJsonDumpPipeline()
-    item = TItem()
+async def test_item_json_dump_pipeline(item_cls):
+    pl = ItemJsonDumpPipeline(to_dict=lambda x: x)
+    item = item_cls()
     item.count = 1
     assert pl.process(item) is item
-    item = TItem()
+    item = item_cls()
     item.info = 'hi'
     pl.process(item)
     await pl.on_spider_close()
@@ -101,7 +84,7 @@ async def test_item_json_dump_pipeline():
     # clean file
     ci = os.getenv('TEST_HOST', 'localhost')
     if ci == 'localhost':
-        os.remove('./Titem.json')
+        os.remove('./Item.json')
 
 
 def test_request_user_agent_pipeline():
@@ -136,7 +119,7 @@ def test_request_random_user_agent_pipeline():
 
 
 @pytest.mark.asyncio
-async def test_item_email_pipeline():
+async def test_item_email_pipeline(item_cls):
     class FakeSMTP:
         async def send_message(self, msg):
             pass
@@ -166,7 +149,8 @@ async def test_item_email_pipeline():
             await pl.send(fsmtp, 'test', 'test', attachments=[f])
 
         # with item
-        item = TItem(info='hi')
+        item = item_cls()
+        item.info = 'hi'
         pl.process(item)
         await pl.on_spider_close()
 
@@ -180,7 +164,9 @@ async def test_item_mysql_pipeline():
 
     bpl = ItemBaseMysqlPipeline(host=mysql_server, port=mysql_port,
                                 user=mysql_user, password=mysql_password,
-                                database='mysql', table='', buffer_length=1)
+                                database='mysql', table='',
+                                to_dict=lambda x: x,
+                                buffer_length=1)
     await bpl.on_spider_open()
     await bpl.push_data('''DROP DATABASE IF EXISTS test;
                            CREATE DATABASE test;''')
@@ -196,43 +182,46 @@ async def test_item_mysql_pipeline():
         PRIMARY KEY (`id`)
         ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;''')
 
-    test_item = Item(test='I ant', test_bool=False, test_int=1, test_float=0.3,
+    test_item = dict(test='I ant', test_bool=False, test_int=1, test_float=0.3,
                      test_bytes=b'\xf0\x9f\x91\x8d',
                      test_datetime=datetime.now())
     ibpl = ItemMysqlInsertPipeline(host=mysql_server, port=mysql_port,
                                    user=mysql_user, password=mysql_password,
                                    database='test', table='test',
+                                   to_dict=lambda x: x,
                                    buffer_length=1)
     await ibpl.on_spider_open()
     assert test_item is await ibpl.process(test_item)
     data = await ibpl.pull_data('SELECT * FROM test')
-    assert test_item.test == data[0]['test']
+    assert test_item['test'] == data[0]['test']
 
     ubpl = ItemMysqlUpdatePipeline(host=mysql_server, port=mysql_port,
                                    user=mysql_user, password=mysql_password,
                                    database='test', table='test',
+                                   to_dict=lambda x: x,
                                    primary_key='id', buffer_length=1)
     await ubpl.on_spider_open()
-    test_item.id = data[0]['id']
-    test_item.test = 'I ANT'
+    test_item['id'] = data[0]['id']
+    test_item['test'] = 'I ANT'
     assert test_item is await ubpl.process(test_item)
     data = await ubpl.pull_data('SELECT * FROM test')
-    assert test_item.test == data[0]['test']
-    test_item.test = None
+    assert test_item['test'] == data[0]['test']
+    test_item['test'] = None
     assert test_item is await ubpl.process(test_item)
     data = await ubpl.pull_data('SELECT * FROM test')
-    assert test_item.test == data[0]['test']
+    assert test_item['test'] == data[0]['test']
 
     iubpl = ItemMysqlInsertUpdatePipeline(
-        ['test'],
+        update_keys=['test'],
         host=mysql_server, port=mysql_port, user=mysql_user,
         password=mysql_password,
+        to_dict=lambda x: x,
         database='test', table='test', buffer_length=1)
     await iubpl.on_spider_open()
-    test_item.test = 'I love ant!'
+    test_item['test'] = 'I love ant!'
     assert test_item is await iubpl.process(test_item)
     data = await iubpl.pull_data('SELECT * FROM test')
-    assert test_item.test == data[0]['test']
+    assert test_item['test'] == data[0]['test']
 
     await ubpl.on_spider_close()
     await ibpl.on_spider_close()

@@ -1,5 +1,5 @@
 from typing import Optional, List, Tuple, DefaultDict, Dict, Any, IO, Union, \
-    Sequence, AnyStr
+    Sequence, AnyStr, Callable
 import asyncio
 import logging
 from collections import defaultdict
@@ -18,7 +18,7 @@ from aiohttp.http import SERVER_SOFTWARE
 from aiohttp import hdrs
 
 from .things import Things, Response, Request, Item
-from .exceptions import FieldValidationError, ThingDropped
+from .exceptions import ThingDropped
 
 
 class Pipeline:
@@ -186,15 +186,6 @@ class ItemPrintPipeline(Pipeline):
         return thing
 
 
-class ItemValidatePipeline(Pipeline):
-    def process(self, thing: Item) -> Union[Things, Exception]:
-        try:
-            thing.validate()
-            return thing
-        except FieldValidationError as e:
-            raise ThingDropped('Validation failed') from e
-
-
 class ItemFieldReplacePipeline(Pipeline):
     def __init__(self, fields: List[str],
                  excess_chars: Tuple[str] = ('\r', '\n', '\t')):
@@ -205,8 +196,9 @@ class ItemFieldReplacePipeline(Pipeline):
     def process(self, thing: Item) -> Item:
         for field in self.fields:
             for char in self.excess_chars:
-                if field in thing and isinstance(thing[field], str):
-                    thing[field] = thing[field].replace(char, '')
+                if isinstance(getattr(thing, field), str):
+                    setattr(
+                        thing, field, getattr(thing, field).replace(char, ''))
         return thing
 
 
@@ -260,13 +252,15 @@ class ItemBaseFileDumpPipeline(Pipeline):
 class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
     """Dump item to json during pipeline closing"""
 
-    def __init__(self, file_dir: str = '.'):
+    def __init__(
+            self, *, to_dict: Callable[[Item], Dict], file_dir: str = '.'):
         super().__init__()
         self.file_dir = file_dir
         self.data: DefaultDict[str, List[Dict]] = defaultdict(list)
+        self.to_dict = to_dict
 
     def process(self, thing: Item) -> Item:
-        self.data[thing.__class__.__name__].append(dict(thing))
+        self.data[thing.__class__.__name__].append(self.to_dict(thing))
         return thing
 
     async def on_spider_close(self) -> None:
@@ -277,8 +271,8 @@ class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
 
 
 class ItemBaseMysqlPipeline(Pipeline):
-    def __init__(self, host: str, port: int, user: str, password: str,
-                 database: str, table: str,
+    def __init__(self, *, host: str, port: int, user: str, password: str,
+                 database: str, table: str, to_dict: Callable[[Item], Dict],
                  charset: str = 'utf8', buffer_length: int = 100):
         super().__init__()
         self.host = host
@@ -287,6 +281,7 @@ class ItemBaseMysqlPipeline(Pipeline):
         self.password = password
         self.database = database
         self.table = table
+        self.to_dict = to_dict
         self.charset = charset
         # writing buffer
         self.buffer: List[str] = []
@@ -356,32 +351,32 @@ class ItemMysqlInsertPipeline(ItemBaseMysqlPipeline):
     sql_format = 'INSERT IGNORE INTO `{database}`.`{table}` ({fields}) ' \
                  'VALUES ({values})'
 
-    async def process(self, thing: Item) -> Item:
+    async def process(self, item: Item) -> Item:
         fields = []
         values = []
-        for k, v in thing.items():
+        for k, v in self.to_dict(item).items():
             fields.append(k)
             values.append(self.convert_item_value(v))
         sql = self.sql_format.format(database=self.database, table=self.table,
                                      fields='`' + '`,`'.join(fields) + '`',
                                      values=','.join(values))
         await self.push_data(sql)
-        return thing
+        return item
 
 
 class ItemMysqlUpdatePipeline(ItemMysqlInsertPipeline):
     sql_format = 'UPDATE `{database}`.`{table}` SET {pairs} WHERE ' \
                  '`{primary_key}`={primary_value}'
 
-    def __init__(self, primary_key: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, primary_key: str,  **kwargs):
+        super().__init__(**kwargs)
         self.primary_key = primary_key
 
-    async def process(self, thing: Item) -> Item:
+    async def process(self, item: Item) -> Item:
         pairs = []
         primary_value = None
 
-        for k, v in thing.items():
+        for k, v in self.to_dict(item).items():
             if k == self.primary_key:
                 primary_value = self.convert_item_value(v)
             else:
@@ -395,22 +390,22 @@ class ItemMysqlUpdatePipeline(ItemMysqlInsertPipeline):
                                          primary_key=self.primary_key,
                                          primary_value=primary_value)
             await self.push_data(sql)
-        return thing
+        return item
 
 
 class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
     sql_format = 'INSERT INTO `{database}`.`{table}` ({fields}) VALUES ' \
                  '({values}) on duplicate key update {pairs}'
 
-    def __init__(self, update_keys: List[str], *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, update_keys: List[str], **kwargs):
+        super().__init__(**kwargs)
         self.update_keys = update_keys
 
-    async def process(self, thing: Item) -> Item:
+    async def process(self, item: Item) -> Item:
         fields = []
         values = []
         pairs = []
-        for k, v in thing.items():
+        for k, v in self.to_dict(item).items():
             v = self.convert_item_value(v)
             fields.append(k)
             values.append(v)
@@ -421,7 +416,7 @@ class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
                                      values=','.join(values),
                                      pairs=','.join(pairs))
         await self.push_data(sql)
-        return thing
+        return item
 
 
 class ItemBaseEmailPipeline(Pipeline):
