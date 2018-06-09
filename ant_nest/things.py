@@ -1,20 +1,17 @@
 """Provide Ant`s Request, Response, Item and Extractor."""
-from typing import Any, Optional, Iterator, Tuple, Dict, Type, Union, List, \
+from typing import Any, Optional, Tuple, Type, Union, List, \
     DefaultDict, AnyStr, IO, Callable, Generator, TypeVar
-from collections.abc import MutableMapping
-import abc
 from collections import defaultdict
 import logging
 import re
 
-from typing_extensions import Protocol
 from aiohttp import ClientResponse, ClientRequest
 from aiohttp.client import DEFAULT_TIMEOUT
 from lxml import html
 import jpath
 import ujson
 
-from .exceptions import FieldValidationError, ItemExtractError
+from .exceptions import ItemExtractError
 
 
 class Request(ClientRequest):
@@ -71,169 +68,8 @@ class CustomNoneType:
     pass
 
 
-_SHADOW_FIELD_NAME_PREFIX = '__field#'
-
-
-class FieldType(Protocol):
-    def __init__(self, value: Any) -> None:
-        pass
-
-
-class IntField:
-    _type: Type[FieldType] = int
-    storage_name = ''
-    __shadow_name_prefix = _SHADOW_FIELD_NAME_PREFIX
-
-    def __init__(self, null: bool = False,
-                 default: Any = CustomNoneType()) -> None:
-        """
-        :param null, is True means this field can be ignore when value have
-            not been set in validation,
-        :param default is None means this field have no default value
-        """
-        self.null = null
-        self.default = default
-
-    def __set__(self, instance: 'Item', value: Any) -> None:
-        setattr(instance, self.storage_name, value)
-
-    def __get__(self, instance: 'Item', owner: Type['Item']) -> Any:
-        try:
-            return getattr(instance, self.storage_name)
-        except AttributeError as e:
-            raise AttributeError(
-                '\'{:s}\' object has no attribute \'{:s}\''.format(
-                    instance.__class__.__name__,
-                    self.get_name_from_shadow(self.storage_name))) from e
-
-    def __delete__(self, instance):
-        delattr(instance, self.storage_name)
-
-    def validate(self, value: Any) -> Any:
-        """:raise FieldValidationError"""
-        try:
-            return self._type(value)
-        except (ValueError, TypeError) as e:
-            raise FieldValidationError(str(e)) from e
-
-    @classmethod
-    def make_shadow_name(cls, name: str) -> str:
-        if name == cls.__shadow_name_prefix:
-            raise AttributeError(
-                'This name: {:s} has been used internally'.format(
-                    cls.__shadow_name_prefix))
-        return cls.__shadow_name_prefix + name
-
-    @classmethod
-    def is_shadow_name(cls, name: str) -> bool:
-        return cls.__shadow_name_prefix in name
-
-    @classmethod
-    def get_name_from_shadow(cls, name: str) -> str:
-        return name.replace(cls.__shadow_name_prefix, '')
-
-
-class FloatField(IntField):
-    _type = float
-
-
-class StringField(IntField):
-    _type = str
-
-
-class BytesField(IntField):
-    _type = bytes
-
-
-# store all item class`s field reference
-_fields: DefaultDict[Type['Item'], Dict[str, IntField]] = defaultdict(dict)
-
-
-class ItemMeta(abc.ABCMeta):
-    def __init__(cls: Type['Item'], name: str, bases: Tuple[type, ...],
-                 attr_dict: Dict[str, Any]) -> None:
-        super().__init__(name, bases, attr_dict)
-        for k, v in attr_dict.items():
-            if isinstance(v, IntField):
-                _fields[cls][k] = v
-                v.storage_name = IntField.make_shadow_name(k)
-        # fetch all fields from base class
-        for base_cls in bases:
-            if base_cls in _fields and issubclass(base_cls, Item):
-                # base item class`s fields must have been set
-                _fields[cls].update(_fields[base_cls])
-
-
-class Item(MutableMapping, metaclass=ItemMeta):
-    """Simple dict-like object with validation"""
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-        # default field value
-        for k, obj in _fields[self.__class__].items():
-            if not isinstance(obj.default, CustomNoneType) and k not in self:
-                setattr(self, k, obj.default)
-
-    def __setattr__(self, key: str, value: Any) -> None:
-        if isinstance(key, str):
-            super().__setattr__(key, value)
-        else:
-            raise AttributeError(
-                'attribute name must be string, not \'{:s}\''.format(
-                    key.__class__.__name__))
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        try:
-            setattr(self, key, value)
-        except TypeError as e:
-            raise KeyError(str(e)) from e
-
-    def __getitem__(self, key: str) -> Any:
-        try:
-            return getattr(self, key)
-        except AttributeError as e:
-            raise KeyError(str(e)) from e
-
-    def __delitem__(self, key: str) -> None:
-        try:
-            delattr(self, key)
-        except AttributeError as e:
-            raise KeyError(str(e)) from e
-
-    def __len__(self) -> int:
-        return len(self.__dict__)
-
-    def __iter__(self) -> Iterator[str]:
-        keys = []
-        for k in self.__dict__:
-            if IntField.is_shadow_name(k):
-                keys.append(IntField.get_name_from_shadow(k))
-            else:
-                keys.append(k)
-        return iter(keys)
-
-    def validate(self):
-        """Validate item`s type.
-        Get descriptors reference method from _fields"""
-        for k, obj in _fields[self.__class__].items():
-            if k in self:
-                setattr(self, k, obj.validate(getattr(self, k)))
-            elif not obj.null:
-                raise FieldValidationError(
-                    '\'{:s}.{:s}\' have no value yet'.format(
-                        self.__class__.__name__, k))
-
-    def __repr__(self):
-        return '{:s}: {:s}'.format(self.__class__.__name__, str(dict(self)))
-
-    def __str__(self):
-        return '{:s}'.format(self.__class__.__name__)
-
-
+Item = TypeVar('Item')
 Things = Union[Request, Response, Item]
-
-
-ExtractedItem = TypeVar('ExtractedItem')
 
 
 class ItemExtractor:
@@ -241,7 +77,7 @@ class ItemExtractor:
     extract_with_join_all = 'join_all'
     extract_with_do_nothing = 'do_nothing'
 
-    def __init__(self, item_class: Type[ExtractedItem]) -> None:
+    def __init__(self, item_class: Type[Item]) -> None:
         self.item_class = item_class
         self.logger = logging.getLogger(self.__class__.__name__)
         self.paths: DefaultDict[str, List[Tuple[str, str, str]]] = \
@@ -307,7 +143,7 @@ class ItemExtractor:
             extract_value = ''.join(extract_value)
         return extract_value
 
-    def extract(self, data: Any) -> ExtractedItem:
+    def extract(self, data: Any) -> Item:
         """Extract item from response or other data by xpath,
         jpath or regex."""
         self.logger.debug('Extract item: {:s} with path: {:s}'.format(
@@ -335,7 +171,7 @@ class ItemExtractor:
 
 class ItemNestExtractor(ItemExtractor):
     def __init__(self, root_path_type: str, root_path: str,
-                 item_class: Type[ExtractedItem]) -> None:
+                 item_class: Type[Item]) -> None:
         self.root_path_type = root_path_type
         self.root_path = root_path
         super().__init__(item_class)
@@ -344,7 +180,7 @@ class ItemNestExtractor(ItemExtractor):
         raise NotImplementedError('This method is dropped in this class')
 
     def extract_items(self, response: Response
-                      ) -> Generator[ExtractedItem, None, None]:
+                      ) -> Generator[Item, None, None]:
         base_data = self.extract_value(
             self.root_path_type, self.root_path, response,
             extract_type=self.extract_with_do_nothing)
@@ -352,6 +188,6 @@ class ItemNestExtractor(ItemExtractor):
             yield super().extract(data)
 
 
-__all__ = ['Request', 'Response', 'Item', 'ItemExtractor', 'ItemNestExtractor',
+__all__ = ['Request', 'Response', 'ItemExtractor', 'ItemNestExtractor',
            'Things'] + \
           [var for var in vars().keys() if 'Field' in var]

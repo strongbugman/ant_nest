@@ -1,5 +1,4 @@
 import asyncio
-from asyncio.unix_events import _UnixSelectorEventLoop
 
 import pytest
 
@@ -7,19 +6,11 @@ from ant_nest import Pool
 from ant_nest import timeout_wrapper
 
 
-@pytest.yield_fixture()
-def event_loop():
-    loop = _UnixSelectorEventLoop()
-    yield loop
-    loop.close()
-
-
 def test_pool():
-    loop = _UnixSelectorEventLoop()
-    pool = Pool(loop=loop)
+    pool = Pool()
     pool.__repr__()
 
-    assert pool.loop is loop
+    assert pool.loop is asyncio.get_event_loop()
     assert pool.limit == -1
     assert pool.raise_exception
     assert pool.running_count == 0
@@ -101,8 +92,8 @@ async def test_schedule_coroutine():
 
 
 @pytest.mark.asyncio
-async def test_as_completed(event_loop):
-    pool = Pool(loop=event_loop)
+async def test_as_completed():
+    pool = Pool(loop=asyncio.get_event_loop())
 
     count = 3
 
@@ -143,6 +134,8 @@ async def test_timeout():
     async def cor():
         await asyncio.sleep(2)
 
+    assert timeout_wrapper(cor, -1) is cor
+
     with pytest.raises(asyncio.TimeoutError):
         await timeout_wrapper(cor(), timeout=0.1)
 
@@ -159,7 +152,7 @@ async def test_timeout():
 @pytest.mark.asyncio
 async def test_as_completed_with_async():
 
-    pool = Pool(loop=asyncio.get_event_loop(), raise_exception=False)
+    pool = Pool(raise_exception=False)
 
     async def cor(x):
         if x < 0:
@@ -176,11 +169,12 @@ async def test_as_completed_with_async():
         result_sum += result
     assert result_sum == sum(range(3))
 
-    async for result in pool.as_completed_with_async([cor(-1)]):
+    async for _ in pool.as_completed_with_async([cor(-1)]):
         raise Exception('This loop should not be entered!')
 
     with pytest.raises(Exception):
-        async for result in pool.as_completed_with_async([cor(-1)], raise_exception=True):
+        async for _ in pool.as_completed_with_async(
+                [cor(-1)], raise_exception=True):
             pass
 
     await pool.close()

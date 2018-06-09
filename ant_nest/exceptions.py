@@ -1,12 +1,8 @@
-__all__ = ['ThingDropped', 'FieldValidationError', 'ItemExtractError']
+__all__ = ['ThingDropped', 'ItemExtractError']
 
 
 class ThingDropped(Exception):
     """Raise when pipeline dropped one thing"""
-
-
-class FieldValidationError(Exception):
-    pass
 
 
 class ItemExtractError(Exception):
