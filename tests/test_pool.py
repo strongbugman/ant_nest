@@ -3,7 +3,8 @@ from asyncio.unix_events import _UnixSelectorEventLoop
 
 import pytest
 
-from ant_nest import CoroutinesPool, timeout_wrapper
+from ant_nest import Pool
+from ant_nest import timeout_wrapper
 
 
 @pytest.yield_fixture()
@@ -15,12 +16,11 @@ def event_loop():
 
 def test_pool():
     loop = _UnixSelectorEventLoop()
-    pool = CoroutinesPool(loop=loop, timeout=3)
+    pool = Pool(loop=loop)
     pool.__repr__()
 
     assert pool.loop is loop
     assert pool.limit == -1
-    assert pool.timeout == 3
     assert pool.raise_exception
     assert pool.running_count == 0
     assert not pool.is_running
@@ -28,12 +28,11 @@ def test_pool():
 
     pool.reset(limit=1, raise_exception=False)
     assert pool.limit == 1
-    assert pool.timeout == 3
     assert not pool.raise_exception
 
     pool._running_count = 1
     del pool
-    pool = CoroutinesPool()
+    pool = Pool()
     del pool
 
 
@@ -46,7 +45,7 @@ async def test_schedule_coroutine():
         nonlocal count
         count += 1
 
-    pool = CoroutinesPool(limit=20)
+    pool = Pool(limit=20)
 
     pool.schedule_coroutines((cor() for i in range(max_count)))
     await pool.wait_scheduled_coroutines()
@@ -103,7 +102,7 @@ async def test_schedule_coroutine():
 
 @pytest.mark.asyncio
 async def test_as_completed(event_loop):
-    pool = CoroutinesPool(loop=event_loop)
+    pool = Pool(loop=event_loop)
 
     count = 3
 
@@ -160,7 +159,7 @@ async def test_timeout():
 @pytest.mark.asyncio
 async def test_as_completed_with_async():
 
-    pool = CoroutinesPool(loop=asyncio.get_event_loop(), raise_exception=False)
+    pool = Pool(loop=asyncio.get_event_loop(), raise_exception=False)
 
     async def cor(x):
         if x < 0:

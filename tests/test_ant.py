@@ -105,44 +105,6 @@ async def test_ant_with_retry():
 
 
 @pytest.mark.asyncio
-async def test_with_timeout():
-    class TestAnt(Ant):
-        request_retries = 0
-        request_timeout = 0.2
-
-        def __init__(self):
-            super().__init__()
-            self.sleep_time = 0.1
-            self.retries = 0
-
-        async def run(self):
-            return None
-
-        async def _request(self, req: Request):
-            self.retries += 1
-            await asyncio.sleep(self.sleep_time)
-            res = fake_response(b'')
-            res.status = 200
-            return res
-
-    ant = TestAnt()
-    await ant.request('https://www.test.com')
-
-    ant.request_timeout = 0.05
-    with pytest.raises(asyncio.TimeoutError):
-        await ant.request('https://www.test.com')
-
-    ant.request_retries = 3
-    ant.request_retry_delay = 0.1
-    ant.retries = 0
-    with pytest.raises(RetryError):
-        await ant.request('http://www.test.com')
-    assert ant.retries == ant.request_retries + 1
-
-    await ant.main()
-
-
-@pytest.mark.asyncio
 async def test_pipelines():
 
     class TestPipeline(Pipeline):
@@ -239,7 +201,7 @@ async def test_with_real_request():
             assert res.simple_text == ''
     # timeout
     with pytest.raises(asyncio.TimeoutError):
-        await ant.request(httpbin_base_url, timeout=0.001, retries=0)
+        await ant.request('http://httpbin.org', timeout=0.00001, retries=0)
     # params
     res = await ant.request(httpbin_base_url + 'get?k1=v1&k2=v2')
     assert res.status == 200
@@ -315,3 +277,5 @@ async def test_with_real_request():
                             response_in_stream=False)
     assert res.status == 200
     assert res.simple_text is not None
+
+    await ant.close()
