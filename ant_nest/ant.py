@@ -19,7 +19,7 @@ from tenacity.stop import stop_after_attempt
 
 from .pipelines import Pipeline
 from .things import Request, Response, Item, Things
-from .coroutine_pool import CoroutinesPool
+from .pool import Pool
 from .exceptions import ThingDropped
 
 __all__ = ['Ant']
@@ -54,7 +54,7 @@ class Ant(abc.ABC):
         self._last_time = self._start_time
         self._report_slot = 60  # report once after one minute by default
         self._session: aiohttp.ClientSession = self.make_session()
-        self.pool = CoroutinesPool(
+        self.pool = Pool(
             limit=self.pool_limit, raise_exception=self.pool_raise_exception)
 
     @property
@@ -275,7 +275,7 @@ class Ant(abc.ABC):
         proxy = req.proxy
         # cookies in headers, params in url
         kwargs = dict(method=req.method, url=req.url, headers=req.headers,
-                      data=req.data)
+                      data=req.data, timeout=req.timeout)
         kwargs['proxy'] = req.proxy
         kwargs['max_redirects'] = self.request_max_redirects
         kwargs['allow_redirects'] = self.request_allow_redirects
@@ -287,6 +287,7 @@ class Ant(abc.ABC):
                 kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = \
                     aiohttp.BasicAuth.from_url(proxy).encode()
 
+        # TODO: request by pass Request object
         response = await self._session._request(**kwargs)
 
         if not req.response_in_stream:

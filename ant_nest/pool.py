@@ -1,5 +1,5 @@
 """
-Coroutines tool box
+Coroutines pool
 """
 import typing
 import logging
@@ -7,15 +7,15 @@ import asyncio
 from asyncio.queues import Queue, QueueEmpty
 from itertools import islice
 
-import async_timeout
+
+__all__ = ['Pool']
 
 
-class CoroutinesPool:
+class Pool:
     """
     Coroutines concurrent execute pool with API like standard
-    "asyncio.ensure_future" and "asyncio.as_completed'
+    "asyncio.ensure_future" and "asyncio.as_completed'.
     """
-
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None,
                  raise_exception: bool = True, limit: int = -1):
         """
@@ -207,9 +207,6 @@ class CoroutinesPool:
     def __del__(self):
         if not self._is_closed:
             if self._running_count > 0 or self._done_queue.qsize() > 0:
-                self.logger.error('Leave with running coroutines!')
+                self.logger.error('Exited with running coroutines!')
             else:
-                self.logger.warning('Leave without pool closed!')
-
-
-__all__ = ['CoroutinesPool', 'timeout_wrapper']
+                self.logger.warning('Exited without pool closed!')
