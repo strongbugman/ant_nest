@@ -53,8 +53,14 @@ class Ant(abc.ABC):
         self._start_time = time.time()
         self._last_time = self._start_time
         self._report_slot = 60  # report once after one minute by default
-        self._session: aiohttp.ClientSession = self.make_session()
-        self.pool = Pool(
+        self.session: aiohttp.ClientSession = ClientSession(
+            response_class=self.response_cls, request_class=self.request_cls,
+            connector=aiohttp.TCPConnector(
+                limit=self.connection_limit,
+                enable_cleanup_closed=True,
+                limit_per_host=self.connection_limit_per_host)
+        )
+        self.pool: Pool = Pool(
             limit=self.pool_limit, raise_exception=self.pool_raise_exception)
 
     @property
@@ -199,7 +205,7 @@ class Ant(abc.ABC):
                 self.logger.exception(
                     'Close pipelines with ' + e.__class__.__name__)
 
-        await self._session.close()
+        await self.session.close()
         await self.pool.close()
 
         self.logger.info('Closed')
@@ -235,16 +241,6 @@ class Ant(abc.ABC):
                             retry_if_exception_type()),
                      stop=stop_after_attempt(retries + 1))
 
-    def make_session(self) -> ClientSession:
-        """Create aiohttp`s ClientSession"""
-        return ClientSession(
-            response_class=self.response_cls, request_class=self.request_cls,
-            connector=aiohttp.TCPConnector(
-                limit=self.connection_limit,
-                enable_cleanup_closed=True,
-                limit_per_host=self.connection_limit_per_host)
-        )
-
     def get_proxy(self) -> Optional[URL]:
         """Chose a proxy, default by random"""
         try:
@@ -274,21 +270,18 @@ class Ant(abc.ABC):
     async def _request(self, req: Request) -> Response:
         proxy = req.proxy
         # cookies in headers, params in url
-        kwargs = dict(method=req.method, url=req.url, headers=req.headers,
-                      data=req.data, timeout=req.timeout)
-        kwargs['proxy'] = req.proxy
-        kwargs['max_redirects'] = self.request_max_redirects
-        kwargs['allow_redirects'] = self.request_allow_redirects
-
+        req_kwargs = dict(method=req.method, url=req.url, headers=req.headers,
+                          data=req.data, timeout=req.timeout, proxy=proxy,
+                          max_redirects=self.request_max_redirects,
+                          allow_redirects=self.request_allow_redirects)
         # proxy auth not work in one session with many requests,
         # add auth header to fix it
-        if req.proxy is not None:
-            if req.proxy.scheme == 'http' and req.proxy.user is not None:
-                kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = \
+        if proxy is not None:
+            if proxy.scheme == 'http' and proxy.user is not None:
+                req_kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = \
                     aiohttp.BasicAuth.from_url(proxy).encode()
 
-        # TODO: request by pass Request object
-        response = await self._session._request(**kwargs)
+        response = await self.session._request(**req_kwargs)
 
         if not req.response_in_stream:
             await response.read()
