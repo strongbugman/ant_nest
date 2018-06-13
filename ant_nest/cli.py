@@ -14,9 +14,11 @@ import tempfile
 import signal
 import functools
 from asyncio.queues import QueueEmpty
+import logging
 
 from .ant import Ant
 from .things import Response
+from .utils import ExceptionFilter
 from . import __version__, _settings_example
 
 __all__ = ['get_ants', 'run_ant', 'open_response_in_browser']
@@ -49,6 +51,12 @@ def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
                     issubclass(obj, Ant) and obj is not Ant):
                 results[module.__name__ + '.' + obj.__name__] = obj
     return results
+
+
+def prepare():
+    logger = logging.getLogger()
+    if logger.level != logging.DEBUG:
+        logging.getLogger().addFilter(ExceptionFilter())
 
 
 async def run_ant(ant: Ant):
@@ -130,6 +138,7 @@ def main(args=None):
         if ant_name in ants:
             loop = asyncio.get_event_loop()
             ant = ants[ant_name]()
+            prepare()
 
             loop.add_signal_handler(signal.SIGINT,
                                     functools.partial(shutdown_ant, ant))
