@@ -185,25 +185,17 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(self.item_pipelines,
                                         self.response_pipelines,
                                         self.request_pipelines):
-            try:
-                obj = pipeline.on_spider_open()
-                if asyncio.iscoroutine(obj):
-                    await obj
-            except Exception as e:
-                self.logger.exception(
-                    'Open pipelines with ' + e.__class__.__name__)
+            obj = pipeline.on_spider_open()
+            if asyncio.iscoroutine(obj):
+                await obj
 
     async def close(self) -> None:
         for pipeline in itertools.chain(self.item_pipelines,
                                         self.response_pipelines,
                                         self.request_pipelines):
-            try:
-                obj = pipeline.on_spider_close()
-                if asyncio.iscoroutine(obj):
-                    await obj
-            except Exception as e:
-                self.logger.exception(
-                    'Close pipelines with ' + e.__class__.__name__)
+            obj = pipeline.on_spider_close()
+            if asyncio.iscoroutine(obj):
+                await obj
 
         await self.session.close()
         await self.pool.close()
@@ -215,15 +207,15 @@ class Ant(abc.ABC):
         """App custom entrance"""
 
     async def main(self) -> None:
-        await self.open()
         try:
+            await self.open()
             await self.run()
+            # wait scheduled coroutines before "self.close" coroutine running
+            await self.pool.wait_scheduled_coroutines()
+            await self.close()
         except Exception as e:
             self.logger.exception(
-                'Run ant run`s coroutine with ' + e.__class__.__name__)
-        # wait scheduled coroutines before "self.close" coroutine running
-        await self.pool.wait_scheduled_coroutines()
-        await self.close()
+                'Run ant with ' + e.__class__.__name__)
         # total report
         for name, counts in self._reports.items():
             self.logger.info('Get {:d} {:s} in total'.format(counts[1], name))

@@ -132,8 +132,10 @@ async def test_pipelines():
     with pytest.raises(TypeError):
         await ant._handle_thing_with_pipelines(thing, pls)
     # exception will be ignored in "open" and "close" method
-    await ant.open()
-    await ant.close()
+    with pytest.raises(TypeError):
+        await ant.open()
+    with pytest.raises(TypeError):
+        await ant.close()
 
 
 @pytest.mark.asyncio
