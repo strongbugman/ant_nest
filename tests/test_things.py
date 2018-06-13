@@ -182,7 +182,7 @@ def test_exception_filter():
     class FakeRecord:
         pass
 
-    fr = ExceptionFilter([ThingDropped])
+    fr = ExceptionFilter()
     rc = FakeRecord()
     rc.exc_info = (ThingDropped, None, None)
 

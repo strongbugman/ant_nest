@@ -7,6 +7,7 @@ import async_timeout
 
 from .ant import Ant
 from .things import ItemExtractor
+from .exceptions import ThingDropped
 
 __all__ = ['extract_value_by_xpath', 'extract_value_by_jpath',
            'extract_value_by_regex', 'ExceptionFilter', 'timeout_wrapper']
@@ -89,11 +90,12 @@ class ExceptionFilter(logging.Filter):
 
     def __init__(
             self,
-            exceptions: typing.List[typing.Type[Exception]], *args, **kwargs):
+            exceptions: typing.Sequence[
+                typing.Type[Exception]] = (ThingDropped, ), *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.exceptions = exceptions
 
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord) -> bool:
         if record.exc_info:
             for e in self.exceptions:
                 if record.exc_info[0] is e:
