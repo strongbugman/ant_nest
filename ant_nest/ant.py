@@ -216,6 +216,7 @@ class Ant(abc.ABC):
         except Exception as e:
             self.logger.exception(
                 'Run ant with ' + e.__class__.__name__)
+        await self.pool.wait_scheduled_coroutines()
         # total report
         for name, counts in self._reports.items():
             self.logger.info('Get {:d} {:s} in total'.format(counts[1], name))
