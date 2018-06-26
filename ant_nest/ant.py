@@ -261,19 +261,21 @@ class Ant(abc.ABC):
         return thing
 
     async def _request(self, req: Request) -> Response:
-        proxy = req.proxy
+        if req.proxy is not None:
+            # proxy auth not work in one session with many requests,
+            # add auth header to fix it
+            if req.proxy.scheme == 'http' and req.proxy.user is not None:
+                req.headers[aiohttp.hdrs.PROXY_AUTHORIZATION] = \
+                    aiohttp.BasicAuth.from_url(req.proxy).encode()
+        if req.headers.get(aiohttp.hdrs.HOST, None) is None:
+            req.headers[aiohttp.hdrs.HOST] = req.url.host
+        print('hhh')
+
         # cookies in headers, params in url
         req_kwargs = dict(method=req.method, url=req.url, headers=req.headers,
-                          data=req.data, timeout=req.timeout, proxy=proxy,
+                          data=req.data, timeout=req.timeout, proxy=req.proxy,
                           max_redirects=self.request_max_redirects,
                           allow_redirects=self.request_allow_redirects)
-        # proxy auth not work in one session with many requests,
-        # add auth header to fix it
-        if proxy is not None:
-            if proxy.scheme == 'http' and proxy.user is not None:
-                req_kwargs['headers'][aiohttp.hdrs.PROXY_AUTHORIZATION] = \
-                    aiohttp.BasicAuth.from_url(proxy).encode()
-
         response = await self.session._request(**req_kwargs)
 
         if not req.response_in_stream:
