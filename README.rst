@@ -14,20 +14,14 @@ AntNest
 Overview
 ========
 
-AntNest is a simple, clear and fast Web Crawler framework build on python3.6+,  powered by asyncio.
-
-As a Scrapy user, I think scrapy provide many awesome features what I think AntNest should have too.This is some main
-difference:
-
-* Scrapy use callback way to write code while AntNest use coroutines
-* Scrapy is stable and widely usage while AntNest is in early development
-* AntNest has only 600+ lines core code now(thanks powerful lib like aiohttp, lxml and other else), and it works
+AntNest is a simple, clear and fast Web Crawler framework build on python3.6+, powered by asyncio.
+It has only 600+ lines core code now(thanks powerful lib like aiohttp, lxml and other else).
 
 Features
 ========
 
 * Things(request, response and item) can though pipelines(in async or not)
-* Item and item extractor,  it`s easy to define and extract(by xpath, jpath or regex) a validated(by field type) item
+* Item and item extractor,  it`s easy to define and extract(by xpath, jpath or regex) one item
 * Custom "ensure_future" and "as_completed" api provide a easy work flow
 
 Install
@@ -38,6 +32,10 @@ Install
 
 Usage
 =====
+
+Create one demo project by cli::
+
+    ant_nest -c
 
 Let`s take a look, create book.py first::
 
@@ -134,6 +132,5 @@ concurrent limit, but it`s complex to get the balance between performance and li
 Todo
 ====
 
-* Create "setting.py" from CLI
-* Nested data(html and json) extractor, done
-* Log system
+[ ] Docs
+[ ] Log system
