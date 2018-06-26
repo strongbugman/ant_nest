@@ -269,7 +269,6 @@ class Ant(abc.ABC):
                     aiohttp.BasicAuth.from_url(req.proxy).encode()
         if req.headers.get(aiohttp.hdrs.HOST, None) is None:
             req.headers[aiohttp.hdrs.HOST] = req.url.host
-        print('hhh')
 
         # cookies in headers, params in url
         req_kwargs = dict(method=req.method, url=req.url, headers=req.headers,
