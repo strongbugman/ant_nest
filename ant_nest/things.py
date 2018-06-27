@@ -2,6 +2,7 @@
 from typing import Any, Optional, Tuple, Type, Union, List, \
     DefaultDict, AnyStr, IO, Callable, Generator, TypeVar
 from collections import defaultdict
+from collections.abc import MutableMapping
 import logging
 import re
 
@@ -11,7 +12,7 @@ from lxml import html
 import jpath
 import ujson
 
-from .exceptions import ItemExtractError
+from .exceptions import ItemExtractError, ItemGetValueError
 
 
 class Request(ClientRequest):
@@ -70,6 +71,26 @@ class CustomNoneType:
 
 Item = TypeVar('Item')
 Things = Union[Request, Response, Item]
+
+
+def set_value_to_item(item: Item, key: str, value: Any):
+    if isinstance(item, MutableMapping):
+        item[key] = value
+    else:
+        setattr(item, key, value)
+
+
+def get_value_by_item(item: Item, key: str, default: Any = CustomNoneType()):
+    try:
+        if isinstance(item, MutableMapping):
+            return item[key]
+        else:
+            return getattr(item, key)
+    except (KeyError, AttributeError) as e:
+        if isinstance(default, CustomNoneType):
+            raise ItemGetValueError from e
+        else:
+            return default
 
 
 class ItemExtractor:
@@ -165,7 +186,7 @@ class ItemExtractor:
                         '{:s}'.format(value, extract_value, str(paths)))
                 value = extract_value
             if not isinstance(value, CustomNoneType):
-                setattr(item, key, value)
+                set_value_to_item(item, key, value)
         return item
 
 

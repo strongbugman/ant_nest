@@ -11,25 +11,25 @@ class GithubAnt(Ant):
     ]
     pool_limit = 1  # save the website`s and your bandwidth!
 
+    def __init__(self):
+        super().__init__()
+        self.item_extractor = ItemExtractor(dict)
+        self.item_extractor.add_xpath('title', '//h1/strong/a/text()')
+        self.item_extractor.add_xpath('author', '//h1/span/a/text()')
+        self.item_extractor.add_xpath(
+            'meta_content',
+            '//div[@class="repository-meta-content col-11 mb-1"]//text()',
+            extract_type=ItemExtractor.extract_with_join_all)
+        self.item_extractor.add_xpath(
+            'star', '//a[@class="social-count js-social-count"]/text()')
+        self.item_extractor.add_xpath(
+            'fork', '//a[@class="social-count"]/text()')
+
     async def crawl_repo(self, url):
         """Crawl information from one repo"""
         response = await self.request(url)
         # extract item from response
-        item = dict()
-        item['title'] = extract_value_by_xpath(
-            '//h1/strong/a/text()',
-            response, ignore_exception=False)  # this page must have one title!
-        item['author'] = extract_value_by_xpath(
-            '//h1/span/a/text()',
-            response, ignore_exception=False)
-        item['meta_content'] = extract_value_by_xpath(
-            '//div[@class="repository-meta-content col-11 mb-1"]//text()',
-            response, extract_type=ItemExtractor.extract_with_join_all,
-            default='Not found!')
-        item['star'] = extract_value_by_xpath(
-            '//a[@class="social-count js-social-count"]/text()', response)
-        item['fork'] = extract_value_by_xpath(
-            '//a[@class="social-count"]/text()', response)
+        item = self.item_extractor.extract(response)
         item['origin_url'] = response.url
 
         await self.collect(item)  # let item go through pipelines(be cleaned)
