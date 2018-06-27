@@ -17,7 +17,8 @@ import aiofiles
 from aiohttp.http import SERVER_SOFTWARE
 from aiohttp import hdrs
 
-from .things import Things, Response, Request, Item
+from .things import (Things, Response, Request, Item, set_value_to_item,
+                     get_value_by_item)
 from .exceptions import ThingDropped
 
 
@@ -187,18 +188,19 @@ class ItemPrintPipeline(Pipeline):
 
 
 class ItemFieldReplacePipeline(Pipeline):
-    def __init__(self, fields: List[str],
-                 excess_chars: Tuple[str] = ('\r', '\n', '\t')):
+    """Replace some chars in item`s field string"""
+    def __init__(self, fields: Sequence[str],
+                 excess_chars: Tuple[str, ...] = ('\r', '\n', '\t')):
         self.fields = fields
         self.excess_chars = excess_chars
         super().__init__()
 
     def process(self, thing: Item) -> Item:
         for field in self.fields:
+            value: str = get_value_by_item(thing, field)
             for char in self.excess_chars:
-                if isinstance(getattr(thing, field), str):
-                    setattr(
-                        thing, field, getattr(thing, field).replace(char, ''))
+                value = value.replace(char, '')
+            set_value_to_item(thing, field, value)
         return thing
 
 
@@ -397,7 +399,7 @@ class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
     sql_format = 'INSERT INTO `{database}`.`{table}` ({fields}) VALUES ' \
                  '({values}) on duplicate key update {pairs}'
 
-    def __init__(self, *, update_keys: List[str], **kwargs):
+    def __init__(self, *, update_keys: Sequence[str], **kwargs):
         super().__init__(**kwargs)
         self.update_keys = update_keys
 
@@ -421,7 +423,7 @@ class ItemMysqlInsertUpdatePipeline(ItemMysqlInsertPipeline):
 
 class ItemBaseEmailPipeline(Pipeline):
     def __init__(self, account: str, password: str, server: str, port: int,
-                 recipients: List[str],
+                 recipients: Sequence[str],
                  sender_name: str = 'AntNest.ItemEmailPipeline',
                  tls: bool = False, starttls: bool = False):
         super().__init__()
@@ -445,7 +447,7 @@ class ItemBaseEmailPipeline(Pipeline):
         return smtp
 
     async def send(self, smtp: aiosmtplib.SMTP, title: str, content: str,
-                   attachments: Optional[List[IO]] = None):
+                   attachments: Optional[Sequence[IO]] = None):
         if attachments is None:
             msg = MIMEText(content)
         else:
