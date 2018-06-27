@@ -7,3 +7,7 @@ class ThingDropped(Exception):
 
 class ItemExtractError(Exception):
     """For extract item"""
+
+
+class ItemGetValueError(Exception):
+    """Raise when get value by wrong key"""
