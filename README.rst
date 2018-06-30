@@ -97,7 +97,7 @@ Then we can list all ants we defined in a console(in "examples") ::
     >>> $ant_nest -l
     ants.example2.GithubAnt
 
-Run it! ::
+Run it! (without debug log)::
 
     >>> ant_nest -a ants.example2.GithubAnt
     INFO:GithubAnt:Opening
