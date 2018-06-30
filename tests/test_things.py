@@ -128,11 +128,6 @@ def test_cli_shutdown():
         cli.shutdown_ant(ant)
 
 
-def test_cli_run_ant():
-    ant = CliAnt()
-    asyncio.get_event_loop().run_until_complete(run_ant(ant))
-
-
 def test_cli():
 
     with pytest.raises(SystemExit):

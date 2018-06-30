@@ -21,7 +21,7 @@ from .things import Response
 from .utils import ExceptionFilter
 from . import __version__, _settings_example
 
-__all__ = ['get_ants', 'run_ant', 'open_response_in_browser']
+__all__ = ['get_ants', 'open_response_in_browser']
 
 __signal_count = 0
 
@@ -57,10 +57,6 @@ def prepare():
     logger = logging.getLogger()
     if logger.level != logging.DEBUG:
         logging.getLogger().addFilter(ExceptionFilter())
-
-
-async def run_ant(ant: Ant):
-    await ant.main()
 
 
 def shutdown_ant(ant: Ant):
@@ -144,7 +140,7 @@ def main(args=None):
                                     functools.partial(shutdown_ant, ant))
             loop.add_signal_handler(signal.SIGTERM,
                                     functools.partial(shutdown_ant, ant))
-            asyncio.get_event_loop().run_until_complete(run_ant(ant))
+            asyncio.get_event_loop().run_until_complete(ant.main())
         else:
             print('Can not find ant by the name "{:s}"'.format(ant_name))
             exit(-1)
