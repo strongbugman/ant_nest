@@ -14,16 +14,19 @@ class GithubAnt(Ant):
     def __init__(self):
         super().__init__()
         self.item_extractor = ItemExtractor(dict)
-        self.item_extractor.add_xpath('title', '//h1/strong/a/text()')
-        self.item_extractor.add_xpath('author', '//h1/span/a/text()')
-        self.item_extractor.add_xpath(
-            'meta_content',
+        self.item_extractor.add_pattern(
+            'xpath', 'title', '//h1/strong/a/text()')
+        self.item_extractor.add_pattern(
+            'xpath', 'author', '//h1/span/a/text()', default='Not found')
+        self.item_extractor.add_pattern(
+            'xpath', 'meta_content',
             '//div[@class="repository-meta-content col-11 mb-1"]//text()',
-            extract_type=ItemExtractor.extract_with_join_all)
-        self.item_extractor.add_xpath(
+            extract_type=ItemExtractor.EXTRACT_WITH_JOIN_ALL)
+        self.item_extractor.add_pattern(
+            'xpath',
             'star', '//a[@class="social-count js-social-count"]/text()')
-        self.item_extractor.add_xpath(
-            'fork', '//a[@class="social-count"]/text()')
+        self.item_extractor.add_pattern(
+            'xpath', 'fork', '//a[@class="social-count"]/text()')
 
     async def crawl_repo(self, url):
         """Crawl information from one repo"""

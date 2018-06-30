@@ -244,8 +244,7 @@ class Ant(abc.ABC):
             self, thing: Things, pipelines: List[Pipeline]) -> Things:
         """Process thing one by one, break the process chain when get
         exception.
-
-        :raise ThingDropped"""
+        """
         self.logger.debug('Process thing: ' + str(thing))
         raw_thing = thing
         for pipeline in pipelines:
