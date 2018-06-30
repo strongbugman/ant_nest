@@ -1,6 +1,6 @@
 """Provide Ant`s Request, Response, Item and Extractor."""
 from typing import Any, Optional, Tuple, Type, Union, List, \
-    DefaultDict, AnyStr, IO, Callable, Generator, TypeVar
+    DefaultDict, AnyStr, IO, Callable, Generator, TypeVar, Dict
 from collections import defaultdict
 from collections.abc import MutableMapping
 import logging
@@ -93,30 +93,23 @@ def get_value_by_item(item: Item, key: str, default: Any = CustomNoneType()):
             return default
 
 
-class ItemExtractor:
-    extract_with_take_first = 'take_first'
-    extract_with_join_all = 'join_all'
-    extract_with_do_nothing = 'do_nothing'
+Resource = Union[Response, html.HtmlElement, str, dict]
 
-    def __init__(self, item_class: Type[Item]) -> None:
-        self.item_class = item_class
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.paths: DefaultDict[str, List[Tuple[str, str, str]]] = \
-            defaultdict(list)
 
-    def add_xpath(self, key: str, xpath: str,
-                  extract_type=extract_with_take_first):
-        self.paths[key].append(('xpath', xpath, extract_type))
-
-    def add_regex(self, key: str, pattern: str,
-                  extract_type=extract_with_take_first):
-        self.paths[key].append(('regex', pattern, extract_type))
-
-    def add_jpath(self, key: str, jpath, extract_type=extract_with_take_first):
-        self.paths[key].append(('jpath', jpath, extract_type))
+class Searcher:
+    """Search data we need from data resource by pattern."""
+    name = 'base'
 
     @staticmethod
-    def _regex_search(pattern: str, data: Any) -> List[str]:
+    def search(pattern: str, data: Response) -> List[Any]:
+        pass
+
+
+class RegexSearcher(Searcher):
+    name = 'regex'
+
+    @staticmethod
+    def search(pattern: str, data: Response) -> List[Any]:
         # convert data to string
         if isinstance(data, Response):
             data = data.simple_text
@@ -126,8 +119,12 @@ class ItemExtractor:
             data = str(data)
         return re.findall(pattern, data)
 
+
+class JsonSearcher(Searcher):
+    name = 'jpath'
+
     @staticmethod
-    def _jpath_search(pattern: str, data: Any) -> List[Any]:
+    def search(pattern: str, data: Response) -> List[Any]:
         # convert data to json object
         if isinstance(data, Response):
             data = data.simple_json
@@ -135,58 +132,90 @@ class ItemExtractor:
             data = ujson.loads(data)
         return jpath.get_all(pattern, data)
 
+
+class XmlSearcher(Searcher):
+    name = 'xpath'
+
     @staticmethod
-    def _xpath_search(pattern: str, data: Any
-                      ) -> List[Union[str, html.HtmlElement]]:
+    def search(pattern: str, data: Response) -> List[Any]:
         if isinstance(data, Response):
             data = data.html_element
         elif not isinstance(data, html.HtmlElement):
             data = html.fromstring(str(data))
         return data.xpath(pattern)
 
-    @staticmethod
-    def extract_value(_type: str, pattern: str, data: Any,
-                      extract_type=extract_with_take_first) -> Any:
-        if _type == 'xpath':
-            extract_value = ItemExtractor._xpath_search(pattern, data)
-        elif _type == 'regex':
-            extract_value = ItemExtractor._regex_search(pattern, data)
-        elif _type == 'jpath':
-            extract_value = ItemExtractor._jpath_search(pattern, data)
+
+class ItemExtractor:
+    """Search data and create item."""
+    EXTRACT_WITH_TAKE_FIRST = 'take_first'
+    EXTRACT_WITH_JOIN_ALL = 'join_all'
+    EXTRACT_WITH_DO_NOTHING = 'do_nothing'
+    searchers: Dict[str, Searcher] = {
+        cls.name: cls for cls in (RegexSearcher, JsonSearcher, XmlSearcher)}
+
+    def __init__(self, item_class: Type[Item]) -> None:
+        self.item_class = item_class
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.rules: DefaultDict[str, List[Tuple[str, str, str, Any]]] = \
+            defaultdict(list)
+        # eg: {'name': [('regex', 'pattern', 'extract_type', 'default'),]}
+
+    def add_pattern(self, _type: str, key: str, pattern: str,
+                    extract_type: str = EXTRACT_WITH_TAKE_FIRST,
+                    default: Any = CustomNoneType()):
+        if _type in self.searchers.keys():
+            self.rules[key].append((_type, pattern, extract_type, default))
         else:
+            raise ValueError(
+                'The type of searcher: {:s} not support'.format(_type))
+
+    @classmethod
+    def extract_value(cls, _type: str, pattern: str, data: Resource,
+                      extract_type=EXTRACT_WITH_TAKE_FIRST,
+                      default: Any = CustomNoneType()) -> Any:
+        if _type not in cls.searchers.keys():
             raise ValueError('The type: {:s} not support'.format(_type))
-        # handle by extract type
-        if extract_type == ItemExtractor.extract_with_take_first:
+
+        extract_value = cls.searchers[_type].search(pattern, data)
+        if not extract_value:
+            if not isinstance(default, CustomNoneType):
+                return default
+            else:
+                raise ItemExtractError(
+                    'Get empty result when extract value'
+                    'with rule: {:s}'.format(str((_type, pattern))))
+        if extract_type == ItemExtractor.EXTRACT_WITH_TAKE_FIRST:
             extract_value = extract_value[0]
-        elif extract_type == ItemExtractor.extract_with_join_all:
+        elif extract_type == ItemExtractor.EXTRACT_WITH_JOIN_ALL:
             extract_value = list(filter(lambda x: isinstance(x, str),
                                         extract_value))  # join string only
             extract_value = ''.join(extract_value)
         return extract_value
 
-    def extract(self, data: Any) -> Item:
-        """Extract item from response or other data by xpath,
-        jpath or regex."""
-        self.logger.debug('Extract item: {:s} with path: {:s}'.format(
-            self.item_class.__name__, str(self.paths)))
+    def extract(self, data: Resource) -> Item:
+        """Create item by patterns"""
+        self.logger.debug('Extract item: {:s} with rule: {:s}'.format(
+            self.item_class.__name__, str(self.rules)))
         item = self.item_class()
-        for key, paths in self.paths.items():
+        for key, rule in self.rules.items():
             value = CustomNoneType()
-            for path_type, path, extract_type in paths:
+            for path_type, path, extract_type, default in rule:
                 try:
-                    extract_value = ItemExtractor.extract_value(
-                        path_type, path, data, extract_type=extract_type)
-                except IndexError:  # IndexError is often raised
+                    extract_value = self.__class__.extract_value(
+                        path_type, path, data, extract_type=extract_type,
+                        default=default)
+                except ItemExtractError:
                     continue
-                # check multiple path`s result
                 if not isinstance(value,
                                   CustomNoneType) and value != extract_value:
                     raise ItemExtractError(
-                        'Match different result: {:s} and {:s} for paths: '
-                        '{:s}'.format(value, extract_value, str(paths)))
+                        'Match different result: {:s} and {:s} for key: '
+                        '{:s}'.format(value, extract_value, key))
                 value = extract_value
             if not isinstance(value, CustomNoneType):
                 set_value_to_item(item, key, value)
+            else:
+                raise ItemExtractError('Can`t extract item`s key: ' + key)
         return item
 
 
@@ -197,14 +226,14 @@ class ItemNestExtractor(ItemExtractor):
         self.root_path = root_path
         super().__init__(item_class)
 
-    def extract(self, response: Response):
+    def extract(self, data: Response):
         raise NotImplementedError('This method is dropped in this class')
 
-    def extract_items(self, response: Response
+    def extract_items(self, data: Resource
                       ) -> Generator[Item, None, None]:
         base_data = self.extract_value(
-            self.root_path_type, self.root_path, response,
-            extract_type=self.extract_with_do_nothing)
+            self.root_path_type, self.root_path, data,
+            extract_type=self.EXTRACT_WITH_DO_NOTHING)
         for data in base_data:
             yield super().extract(data)
 

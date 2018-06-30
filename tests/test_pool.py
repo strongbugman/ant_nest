@@ -155,21 +155,24 @@ async def test_as_completed_with_async():
         return x
 
     result_sum = 0
-    async for result in pool.as_completed_with_async((cor(i) for i in range(5))):
+    async for result in pool.as_completed_with_async(
+            (cor(i) for i in range(5))):
         result_sum += result
     assert result_sum == sum(range(5))
 
     result_sum = 0
-    async for result in pool.as_completed_with_async((cor(i - 2) for i in range(5))):
+    async for result in pool.as_completed_with_async(
+            (cor(i - 2) for i in range(5)), raise_exception=False):
         result_sum += result
     assert result_sum == sum(range(3))
 
-    async for _ in pool.as_completed_with_async([cor(-1)]):
+    async for _ in pool.as_completed_with_async(
+            [cor(-1)], raise_exception=False):
         raise Exception('This loop should not be entered!')
 
     with pytest.raises(Exception):
         async for _ in pool.as_completed_with_async(
-                [cor(-1)], raise_exception=True):
+                [cor(-1)]):
             pass
 
     await pool.close()

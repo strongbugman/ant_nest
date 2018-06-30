@@ -16,19 +16,24 @@ class GithubAnt(Ant):
         response = await self.request(url)
         # extract item from response
         item = dict()
-        item['title'] = extract_value_by_xpath(
+        item['title'] = ItemExtractor.extract_value(
+            'xpath',
             '//h1/strong/a/text()',
-            response, ignore_exception=False)  # this page must have one title!
-        item['author'] = extract_value_by_xpath(
+            response)
+        item['author'] = ItemExtractor.extract_value(
+            'xpath',
             '//h1/span/a/text()',
-            response, ignore_exception=False)
-        item['meta_content'] = extract_value_by_xpath(
+            response)
+        item['meta_content'] = ItemExtractor.extract_value(
+            'xpath',
             '//div[@class="repository-meta-content col-11 mb-1"]//text()',
-            response, extract_type=ItemExtractor.extract_with_join_all,
+            response, extract_type=ItemExtractor.EXTRACT_WITH_JOIN_ALL,
             default='Not found!')
-        item['star'] = extract_value_by_xpath(
+        item['star'] = ItemExtractor.extract_value(
+            'xpath',
             '//a[@class="social-count js-social-count"]/text()', response)
-        item['fork'] = extract_value_by_xpath(
+        item['fork'] = ItemExtractor.extract_value(
+            'xpath',
             '//a[@class="social-count"]/text()', response)
         item['origin_url'] = response.url
 
