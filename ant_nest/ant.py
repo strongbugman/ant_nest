@@ -41,7 +41,6 @@ class Ant(abc.ABC):
     connection_limit = 100  # see "TCPConnector" in "aiohttp"
     connection_limit_per_host = 0
     pool_limit = 100
-    pool_raise_exception = False
 
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -61,7 +60,7 @@ class Ant(abc.ABC):
                 limit_per_host=self.connection_limit_per_host)
         )
         self.pool: Pool = Pool(
-            limit=self.pool_limit, raise_exception=self.pool_raise_exception)
+            limit=self.pool_limit)
 
     @property
     def name(self):

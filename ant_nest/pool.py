@@ -17,11 +17,9 @@ class Pool:
     "asyncio.ensure_future" and "asyncio.as_completed'.
     """
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None,
-                 raise_exception: bool = True, limit: int = -1):
+                 limit: int = -1):
         """
         :param loop: set to "asyncio.get_event_loop()" by default.
-        :param raise_exception: raise coroutine`s exception inside
-            (handle by asyncio) or just log it by logging
         :param limit: concurrency coroutines`s count limit,
             no limit by default.
         """
@@ -32,7 +30,6 @@ class Pool:
             self._loop = loop
 
         self._limit = limit
-        self._raise_exception = raise_exception
         self._queue = Queue(
             loop=self._loop)  # store coroutines waiting for running
         self._done_queue = Queue(loop=self._loop)
@@ -47,10 +44,6 @@ class Pool:
     @property
     def limit(self) -> int:
         return self._limit
-
-    @property
-    def raise_exception(self) -> bool:
-        return self._raise_exception
 
     @property
     def running_count(self) -> int:
@@ -70,14 +63,11 @@ class Pool:
             status = 'ready'
         return status
 
-    def reset(self, limit: typing.Optional[int] = None,
-              raise_exception: typing.Optional[bool] = None):
-        """Rest limit or timeout or raise_exception,
-        it`s safe to call anytime
+    def reset(self, limit: typing.Optional[int] = None):
+        """Rest limit or timeout.
+        It`s safe to call anytime
         """
         self._limit = self._limit if limit is None else limit
-        if raise_exception is not None:
-            self._raise_exception = raise_exception
 
     def schedule_coroutine(self, coroutine: typing.Coroutine) -> None:
         """Like "asyncio.ensure_future", it schedule coroutine in event loop
@@ -98,16 +88,6 @@ class Pool:
                         _done_callback)
             except QueueEmpty:
                 pass
-            # handle exception
-            exception = f.exception()
-            if exception is not None:
-                try:
-                    raise exception
-                except exception.__class__:
-                    if self._raise_exception:
-                        raise exception
-                    else:
-                        self.logger.exception(exception)
 
         if self._is_closed:
             self.logger.warning('This pool has be closed!')
@@ -178,15 +158,10 @@ class Pool:
     async def as_completed_with_async(
             self, coroutines: typing.Iterable[typing.Coroutine],
             limit: typing.Optional[int] = None,
-            raise_exception: typing.Optional[bool] = None,
+            raise_exception: bool = True,
     ) -> typing.AsyncGenerator[typing.Any, None]:
         """as_completed`s async version, can catch and log exception inside.
-
-        :param raise_exception: set to "self._raise_exception" by default
         """
-        if raise_exception is None:
-            raise_exception = self._raise_exception
-
         for coro in self.as_completed(coroutines, limit=limit):
             try:
                 yield await coro
@@ -194,7 +169,9 @@ class Pool:
                 if raise_exception:
                     raise e
                 else:
-                    self.logger.exception(e)
+                    self.logger.exception(
+                        'Get exception {:s} in '
+                        '"as_completed_with_async"'.format(str(e)))
 
     async def close(self):
         self._is_closed = True
