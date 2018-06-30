@@ -20,6 +20,7 @@ It has only 600+ lines core code now(thanks powerful lib like aiohttp, lxml and 
 Features
 ========
 
+* Useful http client out of box
 * Things(request, response and item) can though pipelines(in async or not)
 * Item extractor,  it`s easy to define and extract(by xpath, jpath or regex) one item we want from html, json or strings.
 * Custom "ensure_future" and "as_completed" api provide a easy work flow
@@ -60,16 +61,19 @@ Presume we want to get hot repos from github, let`s create "examples/ants/exampl
         def __init__(self):
             super().__init__()
             self.item_extractor = ItemExtractor(dict)
-            self.item_extractor.add_xpath('title', '//h1/strong/a/text()')
-            self.item_extractor.add_xpath('author', '//h1/span/a/text()')
-            self.item_extractor.add_xpath(
-                'meta_content',
+            self.item_extractor.add_pattern(
+                'xpath', 'title', '//h1/strong/a/text()')
+            self.item_extractor.add_pattern(
+                'xpath', 'author', '//h1/span/a/text()', default='Not found')
+            self.item_extractor.add_pattern(
+                'xpath', 'meta_content',
                 '//div[@class="repository-meta-content col-11 mb-1"]//text()',
-                extract_type=ItemExtractor.extract_with_join_all)
-            self.item_extractor.add_xpath(
+                extract_type=ItemExtractor.EXTRACT_WITH_JOIN_ALL)
+            self.item_extractor.add_pattern(
+                'xpath',
                 'star', '//a[@class="social-count js-social-count"]/text()')
-            self.item_extractor.add_xpath(
-                'fork', '//a[@class="social-count"]/text()')
+            self.item_extractor.add_pattern(
+                'xpath', 'fork', '//a[@class="social-count"]/text()')
 
         async def crawl_repo(self, url):
             """Crawl information from one repo"""
@@ -92,7 +96,7 @@ Presume we want to get hot repos from github, let`s create "examples/ants/exampl
                     self.crawl_repo(response.url.join(URL(url))))
             self.logger.info('Waiting...')
 
-Then we can list all ants we defined in a console(in "examples") ::
+Then we can list all ants we defined (in "examples") ::
 
     >>> $ant_nest -l
     ants.example2.GithubAnt
@@ -120,13 +124,52 @@ Run it! (without debug log)::
     INFO:GithubAnt:Get 6 dict in total
     INFO:GithubAnt:Run GithubAnt in 18.157656 seconds
 
+So, it`s easy to config ant by class attribute ::
+
+    class Ant(abc.ABC):
+        response_pipelines: List[Pipeline] = []
+        request_pipelines: List[Pipeline] = []
+        item_pipelines: List[Pipeline] = []
+        request_cls = Request
+        response_cls = Response
+        request_timeout = DEFAULT_TIMEOUT.total
+        request_retries = 3
+        request_retry_delay = 5
+        request_proxies: List[Union[str, URL]] = []
+        request_max_redirects = 10
+        request_allow_redirects = True
+        response_in_stream = False
+        connection_limit = 100  # see "TCPConnector" in "aiohttp"
+        connection_limit_per_host = 0
+        pool_limit = 100
+
+And you can rewrite some config for one request ::
+
+    async def request(self, url: Union[str, URL], method: str = 'GET',
+                      params: Optional[dict] = None,
+                      headers: Optional[dict] = None,
+                      cookies: Optional[dict] = None,
+                      data: Optional[Union[AnyStr, Dict, IO]] = None,
+                      proxy: Optional[Union[str, URL]] = None,
+                      timeout: Optional[Union[int, float]] = None,
+                      retries: Optional[int] = None,
+                      response_in_stream: Optional[bool] = None
+                      ) -> Response:
+
+About Item, we use dict to store one item in examples, actually it support many way to define our item,
+dict, normal class, atrrs`s class, data class and ORM class, it depend on your need and choice.
+
+Examples
+========
+
+You can get some example in "./examples"
+
 Defect
 ======
 
 * Complex exception handle
 
-one coroutine`s exception will break await chain especially in a loop unless we handle it by
-hand. eg::
+one coroutine`s exception will break await chain especially in a loop, unless we handle it by hand. eg::
 
     for cor in self.pool.as_completed((self.crawl(url) for url in self.urls)):
         try:
@@ -136,17 +179,19 @@ hand. eg::
 
 but we can use "queen.as_completed_with_async" now, eg::
 
-    async fo result in self.pool.as_completed_with_async(self.crawl(url) for ufl in self.urls):
+    async fo result in self.pool.as_completed_with_async(
+    self.crawl(url) for ufl in self.urls, raise_exception=False):
         # exception in "self.crawl(url)" will be passed and logged automatic
         self.handle(result)
 
 * High memory usage
 
-It`s a "feature" that asyncio eat large memory especially with high concurrent IO, one simple solution is set a
-concurrent limit, but it`s complex to get the balance between performance and limit.
+It`s a "feature" that asyncio eat large memory especially with high concurrent IO, we can set a
+concurrent limit("connection_limit" and "pool_limit") simply, but it`s complex to get the balance between performance and limit.
 
 Todo
 ====
 
+[*] Log system
+[*] Nest item extractor
 [ ] Docs
-[ ] Log system
