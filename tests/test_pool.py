@@ -12,14 +12,12 @@ def test_pool():
 
     assert pool.loop is asyncio.get_event_loop()
     assert pool.limit == -1
-    assert pool.raise_exception
     assert pool.running_count == 0
     assert not pool.is_running
     assert pool.status == 'ready'
 
-    pool.reset(limit=1, raise_exception=False)
+    pool.reset(limit=1)
     assert pool.limit == 1
-    assert not pool.raise_exception
 
     pool._running_count = 1
     del pool
@@ -72,20 +70,17 @@ async def test_schedule_coroutine():
         raise Exception('Test exception')
 
     pool.schedule_coroutines(coro() for i in range(max_count))
+    assert pool.status == 'running'
     await pool.wait_scheduled_coroutines()
     assert count == max_count
 
-    pool.reset(raise_exception=False)
-    pool.schedule_coroutines(coro() for i in range(max_count))
-    assert pool.status == 'running'
     await pool.close()
-    assert count == max_count * 2
     assert pool.status == 'closed'
 
     x = coro()
     pool.schedule_coroutine(x)  # this coroutine will not be running
     await pool.close()
-    assert count == max_count * 2
+    assert count == max_count
 
     with pytest.raises(Exception):
         await x
@@ -152,7 +147,7 @@ async def test_timeout():
 @pytest.mark.asyncio
 async def test_as_completed_with_async():
 
-    pool = Pool(raise_exception=False)
+    pool = Pool()
 
     async def cor(x):
         if x < 0:
