@@ -22,7 +22,7 @@ from .things import Request, Response, Item, Things
 from .pool import Pool
 from .exceptions import ThingDropped
 
-__all__ = ['Ant']
+__all__ = ['Ant', 'CliAnt']
 
 
 class Ant(abc.ABC):
@@ -304,3 +304,9 @@ class Ant(abc.ABC):
             reports = self._reports
         counts = reports[report_type]
         counts[1] += 1
+
+
+class CliAnt(Ant):
+    """As a http client"""
+    async def run(self):
+        pass

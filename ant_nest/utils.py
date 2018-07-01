@@ -1,14 +1,11 @@
 """Utilities box"""
 import typing
-import logging
 import asyncio
 
 import async_timeout
 
-from .ant import Ant
-from .exceptions import ThingDropped
 
-__all__ = ['ExceptionFilter', 'timeout_wrapper']
+__all__ = ['timeout_wrapper']
 
 
 def timeout_wrapper(
@@ -31,28 +28,3 @@ def timeout_wrapper(
         return wrapper
     else:
         return wrapper()
-
-
-# TODO: move
-class CliAnt(Ant):
-    async def run(self):
-        pass
-
-
-class ExceptionFilter(logging.Filter):
-    """A exception log filter class for logging.
-    """
-
-    def __init__(
-            self,
-            exceptions: typing.Sequence[
-                typing.Type[Exception]] = (ThingDropped, ), *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.exceptions = exceptions
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        if record.exc_info:
-            for e in self.exceptions:
-                if record.exc_info[0] is e:
-                    return False
-        return True
