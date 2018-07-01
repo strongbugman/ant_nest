@@ -1,10 +1,12 @@
 """Provide Ant`s Request, Response, Item and Extractor."""
-from typing import Any, Optional, Tuple, Type, Union, List, \
-    DefaultDict, AnyStr, IO, Callable, Generator, TypeVar, Dict
+import typing
+import os
 from collections import defaultdict
 from collections.abc import MutableMapping
 import logging
 import re
+import tempfile
+import webbrowser
 
 from aiohttp import ClientResponse, ClientRequest
 from aiohttp.client import DEFAULT_TIMEOUT
@@ -22,7 +24,9 @@ class Request(ClientRequest):
         self.response_in_stream = response_in_stream
         self.timeout = timeout
         # store data obj
-        self.data: Optional[Union[AnyStr, dict, IO]] = kwargs.get('data', None)
+        self.data: typing.Optional[
+            typing.Union[typing.AnyStr, dict, typing.IO]
+        ] = kwargs.get('data', None)
 
 
 class Response(ClientResponse):
@@ -32,7 +36,7 @@ class Response(ClientResponse):
         self._html_element = None
         self._json = None
 
-    def get_text(self, encoding: Optional[str] = None,
+    def get_text(self, encoding: typing.Optional[str] = None,
                  errors: str = 'strict') -> str:
 
         if self._body is None:
@@ -47,13 +51,13 @@ class Response(ClientResponse):
     def simple_text(self) -> str:
         return self.get_text(errors='ignore')
 
-    def get_json(self, loads: Callable = ujson.loads):
+    def get_json(self, loads: typing.Callable = ujson.loads):
         if self._json is None:
             self._json = loads(self.simple_text)
         return self._json
 
     @property
-    def simple_json(self) -> Any:
+    def simple_json(self) -> typing.Any:
         return self.get_json()
 
     @property
@@ -62,6 +66,15 @@ class Response(ClientResponse):
             self._html_element = html.fromstring(self.simple_text)
         return self._html_element
 
+    def open_in_browser(
+            self, file_type: str = '.html',
+            _open_browser_function: typing.Callable
+            [..., bool] = webbrowser.open) -> bool:
+        fd, path = tempfile.mkstemp(file_type)
+        os.write(fd, self._body)
+        os.close(fd)
+        return _open_browser_function('file://' + path)
+
 
 class CustomNoneType:
     """Different with "None" obj ("null" in json)
@@ -69,18 +82,19 @@ class CustomNoneType:
     pass
 
 
-Item = TypeVar('Item')
-Things = Union[Request, Response, Item]
+Item = typing.TypeVar('Item')
+Things = typing.Union[Request, Response, Item]
 
 
-def set_value_to_item(item: Item, key: str, value: Any):
+def set_value_to_item(item: Item, key: str, value: typing.Any):
     if isinstance(item, MutableMapping):
         item[key] = value
     else:
         setattr(item, key, value)
 
 
-def get_value_by_item(item: Item, key: str, default: Any = CustomNoneType()):
+def get_value_from_item(
+        item: Item, key: str, default: typing.Any = CustomNoneType()):
     try:
         if isinstance(item, MutableMapping):
             return item[key]
@@ -93,7 +107,7 @@ def get_value_by_item(item: Item, key: str, default: Any = CustomNoneType()):
             return default
 
 
-Resource = Union[Response, html.HtmlElement, str, dict]
+Resource = typing.Union[Response, html.HtmlElement, str, dict]
 
 
 class Searcher:
@@ -101,7 +115,7 @@ class Searcher:
     name = 'base'
 
     @staticmethod
-    def search(pattern: str, data: Response) -> List[Any]:
+    def search(pattern: str, data: Response) -> typing.List[typing.Any]:
         pass
 
 
@@ -109,7 +123,7 @@ class RegexSearcher(Searcher):
     name = 'regex'
 
     @staticmethod
-    def search(pattern: str, data: Response) -> List[Any]:
+    def search(pattern: str, data: Response) -> typing.List[typing.Any]:
         # convert data to string
         if isinstance(data, Response):
             data = data.simple_text
@@ -124,7 +138,7 @@ class JsonSearcher(Searcher):
     name = 'jpath'
 
     @staticmethod
-    def search(pattern: str, data: Response) -> List[Any]:
+    def search(pattern: str, data: Response) -> typing.List[typing.Any]:
         # convert data to json object
         if isinstance(data, Response):
             data = data.simple_json
@@ -137,7 +151,7 @@ class XmlSearcher(Searcher):
     name = 'xpath'
 
     @staticmethod
-    def search(pattern: str, data: Response) -> List[Any]:
+    def search(pattern: str, data: Response) -> typing.List[typing.Any]:
         if isinstance(data, Response):
             data = data.html_element
         elif not isinstance(data, html.HtmlElement):
@@ -150,19 +164,20 @@ class ItemExtractor:
     EXTRACT_WITH_TAKE_FIRST = 'take_first'
     EXTRACT_WITH_JOIN_ALL = 'join_all'
     EXTRACT_WITH_DO_NOTHING = 'do_nothing'
-    searchers: Dict[str, Searcher] = {
+    searchers: typing.Dict[str, Searcher] = {
         cls.name: cls for cls in (RegexSearcher, JsonSearcher, XmlSearcher)}
 
-    def __init__(self, item_class: Type[Item]) -> None:
+    def __init__(self, item_class: typing.Type[Item]) -> None:
         self.item_class = item_class
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.rules: DefaultDict[str, List[Tuple[str, str, str, Any]]] = \
-            defaultdict(list)
+        self.rules: typing.DefaultDict[
+            str, typing.List[typing.Tuple[str, str, str, typing.Any]]
+        ] = defaultdict(list)
         # eg: {'name': [('regex', 'pattern', 'extract_type', 'default'),]}
 
     def add_pattern(self, _type: str, key: str, pattern: str,
                     extract_type: str = EXTRACT_WITH_TAKE_FIRST,
-                    default: Any = CustomNoneType()):
+                    default: typing.Any = CustomNoneType()):
         if _type in self.searchers.keys():
             self.rules[key].append((_type, pattern, extract_type, default))
         else:
@@ -172,7 +187,7 @@ class ItemExtractor:
     @classmethod
     def extract_value(cls, _type: str, pattern: str, data: Resource,
                       extract_type=EXTRACT_WITH_TAKE_FIRST,
-                      default: Any = CustomNoneType()) -> Any:
+                      default: typing.Any = CustomNoneType()) -> typing.Any:
         if _type not in cls.searchers.keys():
             raise ValueError('The type: {:s} not support'.format(_type))
 
@@ -221,7 +236,7 @@ class ItemExtractor:
 
 class ItemNestExtractor(ItemExtractor):
     def __init__(self, root_path_type: str, root_path: str,
-                 item_class: Type[Item]) -> None:
+                 item_class: typing.Type[Item]) -> None:
         self.root_path_type = root_path_type
         self.root_path = root_path
         super().__init__(item_class)
@@ -230,7 +245,7 @@ class ItemNestExtractor(ItemExtractor):
         raise NotImplementedError('This method is dropped in this class')
 
     def extract_items(self, data: Resource
-                      ) -> Generator[Item, None, None]:
+                      ) -> typing.Generator[Item, None, None]:
         base_data = self.extract_value(
             self.root_path_type, self.root_path, data,
             extract_type=self.EXTRACT_WITH_DO_NOTHING)

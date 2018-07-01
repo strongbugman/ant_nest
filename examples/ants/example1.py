@@ -9,7 +9,7 @@ class GithubAnt(Ant):
             ('meta_content', 'star', 'fork'),
             excess_chars=('\r', '\n', '\t', '  '))
     ]
-    pool_limit = 1  # save the website`s and your bandwidth!
+    concurrent_limit = 1  # save the website`s and your bandwidth!
 
     async def crawl_repo(self, url):
         """Crawl information from one repo"""
@@ -42,11 +42,11 @@ class GithubAnt(Ant):
 
     async def run(self):
         """App entrance, our play ground"""
-        response = await self.request('https://github.com/explore')
+        response = await self.request('https://www.python.org')
         for url in response.html_element.xpath(
                 '/html/body/div[4]/div[2]/div/div[2]/div[1]/article//h1/a[2]/'
                 '@href'):
             # crawl many repos with our coroutines pool
-            self.pool.schedule_coroutine(
+            self.schedule_coroutine(
                 self.crawl_repo(response.url.join(URL(url))))
         self.logger.info('Waiting...')

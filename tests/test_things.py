@@ -1,4 +1,3 @@
-import os
 import sys
 import asyncio
 from unittest import mock
@@ -43,6 +42,13 @@ def test_response():
     res.get_encoding = lambda: 'utf-8'
     res._get_encoding = lambda: 'utf-8'
     assert res.get_text() == '1'
+
+    res = fake_response(b'')
+
+    def open_browser_function(url):
+        return True
+
+    assert res.open_in_browser(_open_browser_function=open_browser_function)
 
 
 def test_extract():
@@ -123,10 +129,10 @@ def test_cli_get_ants():
 
 def test_cli_shutdown():
     ant = CliAnt()
-    ant.pool._queue.put_nowait(object())
+    ant._queue.put_nowait(object())
     cli.shutdown_ant(ant)
-    assert ant.pool._is_closed
-    assert ant.pool._queue.qsize() == 0
+    assert ant._is_closed
+    assert ant._queue.qsize() == 0
 
     with pytest.raises(SystemExit):
         cli.shutdown_ant(ant)
@@ -159,22 +165,11 @@ def test_cli():
         cli.main(['-a' 'FakeAnt'])
         cli.main(['-l'])
 
-    with pytest.raises(SystemExit), mock.patch('os.mkdir', lambda x: None):
+    with pytest.raises(SystemExit), mock.patch('os.mkdir', lambda x: None), \
+            mock.patch('shutil.copyfile', lambda *args: None):
         cli.main(['-c' '.'])
 
     cli.main(['-a' 'tests.test_things.CliAnt'])
-
-
-def test_cli_open_browser():
-    req = Request('GET', URL('http://test.com'))
-    res = fake_response(b'')
-
-    def open_browser_function(url):
-        return True
-
-    assert open_response_in_browser(
-        res,
-        _open_browser_function=open_browser_function)
 
 
 def test_exception_filter():
