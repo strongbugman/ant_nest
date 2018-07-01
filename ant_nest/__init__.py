@@ -4,7 +4,6 @@ from .pipelines import *  # noqa
 from .pool import *  # noqa
 from .exceptions import *  # noqa
 from .utils import *  # noqa
-from .utils import CliAnt  # noqa
 
 __version__ = '0.35'
 
