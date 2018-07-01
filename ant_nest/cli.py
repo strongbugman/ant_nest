@@ -1,5 +1,5 @@
 """CLI entry points"""
-from typing import Type, Dict, List, Callable
+import typing
 import argparse
 import inspect
 import os
@@ -9,22 +9,17 @@ import asyncio
 from importlib import import_module
 from pkgutil import iter_modules
 from traceback import format_exc
-import webbrowser
-import tempfile
 import signal
 import functools
 from asyncio.queues import QueueEmpty
 
 from .ant import Ant
-from .things import Response
 from . import __version__, _settings_example
-
-__all__ = ['get_ants', 'open_response_in_browser']
 
 __signal_count = 0
 
 
-def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
+def get_ants(paths: typing.List[str]) -> typing.Dict[str, typing.Type[Ant]]:
     """Get ant classes by package path"""
     modules = []
     results = {}
@@ -63,21 +58,12 @@ def shutdown_ant(ant: Ant):
           'shutdown'.format(ant.name))
 
     # drop waiting coroutines
-    ant.pool._is_closed = True
+    ant._is_closed = True
     while True:
         try:
-            ant.pool._queue.get_nowait()
+            ant._queue.get_nowait()
         except QueueEmpty:
             break
-
-
-def open_response_in_browser(
-        response: Response, file_type: str = '.html',
-        _open_browser_function: Callable[..., bool] = webbrowser.open) -> bool:
-    fd, path = tempfile.mkstemp(file_type)
-    os.write(fd, response._content)
-    os.close(fd)
-    return _open_browser_function('file://' + path)
 
 
 def main(args=None):

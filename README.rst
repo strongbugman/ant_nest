@@ -56,7 +56,7 @@ Presume we want to get hot repos from github, let`s create "examples/ants/exampl
                 ('meta_content', 'star', 'fork'),
                 excess_chars=('\r', '\n', '\t', '  '))
         ]
-        pool_limit = 1  # save the website`s and your bandwidth!
+        concurrent_limit = 1  # save the website`s and your bandwidth!
 
         def __init__(self):
             super().__init__()
@@ -92,7 +92,7 @@ Presume we want to get hot repos from github, let`s create "examples/ants/exampl
                     '/html/body/div[4]/div[2]/div/div[2]/div[1]/article//h1/a[2]/'
                     '@href'):
                 # crawl many repos with our coroutines pool
-                self.pool.schedule_coroutine(
+                self.schedule_coroutine(
                     self.crawl_repo(response.url.join(URL(url))))
             self.logger.info('Waiting...')
 
@@ -141,7 +141,7 @@ So, it`s easy to config ant by class attribute ::
         response_in_stream = False
         connection_limit = 100  # see "TCPConnector" in "aiohttp"
         connection_limit_per_host = 0
-        pool_limit = 100
+        concurrent_limit = 100
 
 And you can rewrite some config for one request ::
 
@@ -171,7 +171,7 @@ Defect
 
 one coroutine`s exception will break await chain especially in a loop, unless we handle it by hand. eg::
 
-    for cor in self.pool.as_completed((self.crawl(url) for url in self.urls)):
+    for cor in self.as_completed((self.crawl(url) for url in self.urls)):
         try:
             await cor
         except Exception:  # may raise many exception in a await chain
@@ -179,7 +179,7 @@ one coroutine`s exception will break await chain especially in a loop, unless we
 
 but we can use "queen.as_completed_with_async" now, eg::
 
-    async fo result in self.pool.as_completed_with_async(
+    async fo result in self.as_completed_with_async(
     self.crawl(url) for ufl in self.urls, raise_exception=False):
         # exception in "self.crawl(url)" will be passed and logged automatic
         self.handle(result)
