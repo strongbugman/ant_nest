@@ -6,7 +6,7 @@ from yarl import URL
 import pytest
 
 from ant_nest import *
-from ant_nest import CliAnt
+from ant_nest.ant import CliAnt
 from ant_nest.cli import *
 from ant_nest import cli
 

@@ -40,8 +40,8 @@ def get_ants(paths: typing.List[str]) -> typing.Dict[str, typing.Type[Ant]]:
     # get and sift ant class obj from modules
     for module in modules:
         for name, obj in inspect.getmembers(module):
-            if (isinstance(obj, type) and
-                    issubclass(obj, Ant) and obj is not Ant):
+            if isinstance(obj, type) and issubclass(
+                    obj, Ant) and obj is not Ant:
                 results[module.__name__ + '.' + obj.__name__] = obj
     return results
 
