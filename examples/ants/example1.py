@@ -42,7 +42,7 @@ class GithubAnt(Ant):
 
     async def run(self):
         """App entrance, our play ground"""
-        response = await self.request('https://www.python.org')
+        response = await self.request('https://github.com/explore')
         for url in response.html_element.xpath(
                 '/html/body/div[4]/div[2]/div/div[2]/div[1]/article//h1/a[2]/'
                 '@href'):

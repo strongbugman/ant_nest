@@ -7,6 +7,7 @@ import aiohttp
 from yarl import URL
 
 from ant_nest import *
+from ant_nest.ant import CliAnt
 from .test_things import fake_response
 
 
