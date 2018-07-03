@@ -51,6 +51,18 @@ def test_response():
     assert res.open_in_browser(_open_browser_function=open_browser_function)
 
 
+def test_item_set_read():
+    class ClsItem:
+        pass
+
+    for item in (dict(), ClsItem()):
+        set_value_to_item(item, 'name', 'test')
+        assert get_value_from_item(item, 'name') == 'test'
+        assert get_value_from_item(item, 'name2', default='test') == 'test'
+        with pytest.raises(ItemGetValueError):
+            get_value_from_item(item, 'name2')
+
+
 def test_extract():
     with open('./tests/test.html', 'rb') as f:
         response = fake_response(f.read())
@@ -83,6 +95,8 @@ def test_extract():
     item = item_extractor.extract(response)
     assert item.author == 1
     assert item.freedom is None  # "None" obj can be extracted from json
+    with pytest.raises(ValueError):
+        item_extractor.add_pattern('other', 'key', 'pattern')
     # extract single value with ValueError
     with pytest.raises(ValueError):
         ItemExtractor.extract_value('something else', 'test', 'test')

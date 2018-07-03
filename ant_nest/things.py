@@ -116,7 +116,7 @@ class Searcher:
 
     @staticmethod
     def search(pattern: str, data: Response) -> typing.List[typing.Any]:
-        pass
+        """Search information from source data by pattern"""
 
 
 class RegexSearcher(Searcher):
@@ -254,5 +254,4 @@ class ItemNestExtractor(ItemExtractor):
 
 
 __all__ = ['Request', 'Response', 'ItemExtractor', 'ItemNestExtractor',
-           'Things'] + \
-          [var for var in vars().keys() if 'Field' in var]
+           'Things', 'get_value_from_item', 'set_value_to_item']
