@@ -176,7 +176,9 @@ class Ant(abc.ABC):
     ) -> typing.Callable[[typing.Callable], typing.Callable]:
         return retry(wait=wait_fixed(delay),
                      retry=(retry_if_result(lambda res: res.status >= 500) |
-                            retry_if_exception_type()),
+                            retry_if_exception_type(
+                                exception_types=aiohttp.ClientError)
+                            ),
                      stop=stop_after_attempt(retries + 1))
 
     def get_proxy(self) -> typing.Optional[URL]:
