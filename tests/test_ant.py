@@ -3,7 +3,7 @@ import os
 
 import pytest
 from tenacity import RetryError
-import asyncio
+import aiohttp
 from yarl import URL
 
 from ant_nest import *
@@ -61,7 +61,7 @@ async def test_ant_with_retry():
         async def _request(self, req: Request):
             if self.retries < self.min_retries:
                 self.retries += 1
-                raise IOError()
+                raise aiohttp.ClientConnectionError()
             else:
                 res = fake_response(b'')
                 res.status = 200
@@ -77,7 +77,7 @@ async def test_ant_with_retry():
     ant.request_retries = 3
     await ant.request('https://www.test.com')
     ant.retries = 0
-    with pytest.raises(IOError):
+    with pytest.raises(aiohttp.ClientConnectionError):
         await ant.request('https://www.test.com', retries=0)
 
     await ant.main()
