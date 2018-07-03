@@ -156,7 +156,11 @@ And you can rewrite some config for one request ::
                       response_in_stream: Optional[bool] = None
                       ) -> Response:
 
-About Item, we use dict to store one item in examples, actually it support many way to define our item,
+
+About Item
+==========
+
+We use dict to store one item in examples, actually it support many way to define our item:
 dict, normal class, atrrs`s class, data class and ORM class, it depend on your need and choice.
 
 Examples
