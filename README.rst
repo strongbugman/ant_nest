@@ -191,7 +191,7 @@ but we can use "queen.as_completed_with_async" now, eg::
 * High memory usage
 
 It`s a "feature" that asyncio eat large memory especially with high concurrent IO, we can set a
-concurrent limit("connection_limit" and "pool_limit") simply, but it`s complex to get the balance between performance and limit.
+concurrent limit("connection_limit" or "concurrent_limit") simply, but it`s complex to get the balance between performance and limit.
 
 Todo
 ====
