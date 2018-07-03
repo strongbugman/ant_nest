@@ -4,7 +4,6 @@ import logging
 
 from ant_nest import ExceptionFilter
 
-# your ant`s class modules or packages
 ANT_PACKAGES = ['ants']
 ANT_ENV = os.getenv('ANT_ENV', 'development')
 
@@ -14,6 +13,7 @@ else:
     logging.basicConfig(level=logging.INFO)
     logging.getLogger().addFilter(ExceptionFilter())
 
+# your ant`s class modules or packages
 
 # custom setting, eg:
 # MYSQL_HOST = '127.0.0.1'

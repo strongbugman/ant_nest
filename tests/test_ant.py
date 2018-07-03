@@ -3,7 +3,7 @@ import os
 
 import pytest
 from tenacity import RetryError
-import asyncio
+import aiohttp
 from yarl import URL
 
 from ant_nest import *
@@ -61,7 +61,7 @@ async def test_ant_with_retry():
         async def _request(self, req: Request):
             if self.retries < self.min_retries:
                 self.retries += 1
-                raise IOError()
+                raise aiohttp.ClientConnectionError()
             else:
                 res = fake_response(b'')
                 res.status = 200
@@ -77,7 +77,7 @@ async def test_ant_with_retry():
     ant.request_retries = 3
     await ant.request('https://www.test.com')
     ant.retries = 0
-    with pytest.raises(IOError):
+    with pytest.raises(aiohttp.ClientConnectionError):
         await ant.request('https://www.test.com', retries=0)
 
     await ant.main()
@@ -179,11 +179,7 @@ async def test_ant_report():
 async def test_with_real_request():
     httpbin_base_url = os.getenv('TEST_HTTPBIN', 'http://localhost:8080/')
 
-    class TestAnt(Ant):
-        async def run(self):
-            return None
-
-    ant = TestAnt()
+    ant = CliAnt()
     res = await ant.request(httpbin_base_url)
     assert res.status == 200
     # method
@@ -195,7 +191,7 @@ async def test_with_real_request():
         else:
             assert res.simple_text == ''
         # short way
-        res = await getattr(ant, method.lower())(httpbin_base_url + 'anything')
+        res = await ant.request(httpbin_base_url + 'anything', method=method)
         assert res.status == 200
         if method != 'HEAD':
             assert res.simple_json['method'] == method
@@ -206,12 +202,13 @@ async def test_with_real_request():
     assert res.status == 200
     assert res.simple_json['args']['k1'] == 'v1'
     assert res.simple_json['args']['k2'] == 'v2'
-    res = await ant.get(httpbin_base_url + 'get', params={'k1': 'v1', 'k2': 'v2'})
+    res = await ant.request(httpbin_base_url + 'get', params={'k1': 'v1', 'k2': 'v2'})
     assert res.status == 200
     assert res.simple_json['args']['k1'] == 'v1'
     assert res.simple_json['args']['k2'] == 'v2'
     # data with str
-    res = await ant.post(httpbin_base_url + 'post', data='Test data')
+    res = await ant.request(
+        httpbin_base_url + 'post', data='Test data', method='POST')
     assert res.status == 200
     assert res.simple_json['data'] == 'Test data'
     # data with dict
@@ -259,7 +256,7 @@ async def test_with_real_request():
     res = await ant.request('http://httpbin.org/anything')
     assert res.status == 200
     # set proxy by request
-    res = await ant.get('http://httpbin.org/anything', proxy=proxy)
+    res = await ant.request('http://httpbin.org/anything', proxy=proxy)
     assert res.status == 200
     # with stream
     ant.response_in_stream = True
@@ -278,3 +275,151 @@ async def test_with_real_request():
     assert res.simple_text is not None
 
     await ant.close()
+
+
+@pytest.mark.asyncio
+async def test_schedule_coroutine():
+    count = 0
+    max_count = 10
+
+    async def cor():
+        nonlocal count
+        count += 1
+
+    ant = CliAnt()
+
+    ant.schedule_coroutines((cor() for i in range(max_count)))
+    await ant.wait_scheduled_coroutines()
+    assert count == max_count
+    # test with limit
+    count = 0
+    running_count = 0
+    max_running_count = -1
+    concurrent_limit = 3
+
+    async def cor():
+        nonlocal count, running_count, max_running_count
+        running_count += 1
+        max_running_count = max(running_count, max_running_count)
+        await asyncio.sleep(0.1)
+        count += 1
+        running_count -= 1
+
+    ant.concurrent_limit = concurrent_limit
+    ant.schedule_coroutines(cor() for i in range(max_count))
+    assert ant.is_running
+    await ant.wait_scheduled_coroutines()
+    assert count == max_count
+    assert max_running_count <= concurrent_limit
+    # test with exception
+    count = 0
+    max_count = 3
+
+    async def coro():
+        nonlocal count
+        count += 1
+        raise Exception('Test exception')
+
+    ant.schedule_coroutines(coro() for i in range(max_count))
+    await ant.wait_scheduled_coroutines()
+    assert count == max_count
+
+    # test with closed ant
+    await ant.close()
+
+    x = coro()
+    ant.schedule_coroutine(x)  # this coroutine will not be running
+    await ant.close()
+    assert count == max_count
+    with pytest.raises(Exception):
+        await x
+
+
+@pytest.mark.asyncio
+async def test_as_completed():
+    ant = CliAnt(loop=asyncio.get_event_loop())
+    count = 3
+
+    async def cor(i):
+        return i
+
+    right_result = 0
+    for c in ant.as_completed((cor(i) for i in range(count)), limit=-1):
+        await c
+        right_result += 1
+    assert right_result == count
+
+    async def cor(i):
+        await asyncio.sleep(i * 0.1)
+        return i
+
+    right_result = 0  # 0, 1, 2
+    for c in ant.as_completed((cor(i) for i in reversed(range(count)))):
+        result = await c
+        assert result == right_result
+        right_result += 1
+    assert right_result == count
+    # with limit
+    right_result = 2  # 2, 1, 0
+    for c in ant.as_completed((cor(i) for i in reversed(range(count))), limit=1):
+        result = await c
+        assert result == right_result
+        right_result -= 1
+    assert right_result == -1
+
+    await ant.close()
+
+
+@pytest.mark.asyncio
+async def test_as_completed_with_async():
+
+    ant = CliAnt()
+
+    async def cor(x):
+        if x < 0:
+            raise Exception('Test exception')
+        return x
+
+    result_sum = 0
+    async for result in ant.as_completed_with_async(
+            (cor(i) for i in range(5))):
+        result_sum += result
+    assert result_sum == sum(range(5))
+
+    result_sum = 0
+    async for result in ant.as_completed_with_async(
+            (cor(i - 2) for i in range(5)), raise_exception=False):
+        result_sum += result
+    assert result_sum == sum(range(3))
+
+    async for _ in ant.as_completed_with_async(
+            [cor(-1)], raise_exception=False):
+        raise Exception('This loop should not be entered!')
+
+    with pytest.raises(Exception):
+        async for _ in ant.as_completed_with_async(
+                [cor(-1)]):
+            pass
+
+    await ant.close()
+
+
+@pytest.mark.asyncio
+async def test_timeout():
+
+    async def cor():
+        await asyncio.sleep(2)
+
+    assert timeout_wrapper(cor, -1) is cor
+
+    with pytest.raises(asyncio.TimeoutError):
+        await timeout_wrapper(cor(), timeout=0.1)
+
+    with pytest.raises(asyncio.TimeoutError):
+        await timeout_wrapper(cor, timeout=0.1)()
+
+    async def bar():
+        await timeout_wrapper(cor(), timeout=0.1)
+
+    with pytest.raises(asyncio.TimeoutError):
+        await timeout_wrapper(bar(), timeout=0.2)

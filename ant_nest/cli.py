@@ -1,5 +1,5 @@
 """CLI entry points"""
-from typing import Type, Dict, List, Callable
+import typing
 import argparse
 import inspect
 import os
@@ -9,24 +9,17 @@ import asyncio
 from importlib import import_module
 from pkgutil import iter_modules
 from traceback import format_exc
-import webbrowser
-import tempfile
 import signal
 import functools
 from asyncio.queues import QueueEmpty
-import logging
 
 from .ant import Ant
-from .things import Response
-from .utils import ExceptionFilter
 from . import __version__, _settings_example
-
-__all__ = ['get_ants', 'run_ant', 'open_response_in_browser']
 
 __signal_count = 0
 
 
-def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
+def get_ants(paths: typing.List[str]) -> typing.Dict[str, typing.Type[Ant]]:
     """Get ant classes by package path"""
     modules = []
     results = {}
@@ -53,16 +46,6 @@ def get_ants(paths: List[str]) -> Dict[str, Type[Ant]]:
     return results
 
 
-def prepare():
-    logger = logging.getLogger()
-    if logger.level != logging.DEBUG:
-        logging.getLogger().addFilter(ExceptionFilter())
-
-
-async def run_ant(ant: Ant):
-    await ant.main()
-
-
 def shutdown_ant(ant: Ant):
     global __signal_count
     if __signal_count == 1:
@@ -75,21 +58,12 @@ def shutdown_ant(ant: Ant):
           'shutdown'.format(ant.name))
 
     # drop waiting coroutines
-    ant.pool._is_closed = True
+    ant._is_closed = True
     while True:
         try:
-            ant.pool._queue.get_nowait()
+            ant._queue.get_nowait()
         except QueueEmpty:
             break
-
-
-def open_response_in_browser(
-        response: Response, file_type: str = '.html',
-        _open_browser_function: Callable[..., bool] = webbrowser.open) -> bool:
-    fd, path = tempfile.mkstemp(file_type)
-    os.write(fd, response._content)
-    os.close(fd)
-    return _open_browser_function('file://' + path)
 
 
 def main(args=None):
@@ -138,13 +112,12 @@ def main(args=None):
         if ant_name in ants:
             loop = asyncio.get_event_loop()
             ant = ants[ant_name]()
-            prepare()
 
             loop.add_signal_handler(signal.SIGINT,
                                     functools.partial(shutdown_ant, ant))
             loop.add_signal_handler(signal.SIGTERM,
                                     functools.partial(shutdown_ant, ant))
-            asyncio.get_event_loop().run_until_complete(run_ant(ant))
+            asyncio.get_event_loop().run_until_complete(ant.main())
         else:
             print('Can not find ant by the name "{:s}"'.format(ant_name))
             exit(-1)
