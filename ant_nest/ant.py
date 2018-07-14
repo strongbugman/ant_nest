@@ -157,10 +157,14 @@ class Ant(abc.ABC):
         try:
             await self.open()
             await self.run()
-            await self.close()
         except Exception as e:
             self.logger.exception(
                 'Run ant with ' + e.__class__.__name__)
+        try:
+            await self.close()
+        except Exception as e:
+            self.logger.exception(
+                'Close ant with ' + e.__class__.__name__)
         # total report
         for name, counts in self._reports.items():
             self.logger.info('Get {:d} {:s} in total'.format(counts[1], name))
