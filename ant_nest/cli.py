@@ -14,7 +14,7 @@ import functools
 from asyncio.queues import QueueEmpty
 
 from .ant import Ant
-from . import __version__, _settings_example
+from . import __version__
 
 __signal_count = 0
 
@@ -80,6 +80,7 @@ def main(args=None):
         print(__version__)
         exit()
     elif args.project:
+        from . import _settings_example
         try:
             os.mkdir(args.project)
         except FileExistsError:
