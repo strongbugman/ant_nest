@@ -181,10 +181,10 @@ one coroutine`s exception will break await chain especially in a loop, unless we
         except Exception:  # may raise many exception in a await chain
             pass
 
-but we can use "queen.as_completed_with_async" now, eg::
+but we can use "self.as_completed_with_async" now, eg::
 
     async fo result in self.as_completed_with_async(
-    self.crawl(url) for ufl in self.urls, raise_exception=False):
+    self.crawl(url) for url in self.urls, raise_exception=False):
         # exception in "self.crawl(url)" will be passed and logged automatic
         self.handle(result)
 
