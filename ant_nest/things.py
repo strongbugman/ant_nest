@@ -8,25 +8,31 @@ import re
 import tempfile
 import webbrowser
 
-from aiohttp import ClientResponse, ClientRequest
+from aiohttp import ClientResponse, ClientRequest, hdrs
 from aiohttp.client import DEFAULT_TIMEOUT
 from lxml import html
 import jpath
 import ujson
+from multidict import CIMultiDict
 
 from .exceptions import ItemExtractError, ItemGetValueError
 
 
 class Request(ClientRequest):
     def __init__(self, *args, timeout: float = DEFAULT_TIMEOUT.total,
-                 response_in_stream: bool = False, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+                 response_in_stream: bool = False,
+                 headers: typing.Optional[CIMultiDict] = None,
+                 data: typing.Optional[
+                     typing.Union[typing.AnyStr, dict, typing.IO]] = None,
+                 **kwargs) -> None:
+        super().__init__(*args, headers=headers, data=data, **kwargs)
+
+        if headers is None or hdrs.HOST not in headers:
+            self.headers.pop(hdrs.HOST)
+
         self.response_in_stream = response_in_stream
         self.timeout = timeout
-        # store data obj
-        self.data: typing.Optional[
-            typing.Union[typing.AnyStr, dict, typing.IO]
-        ] = kwargs.get('data', None)
+        self.data = data
 
 
 class Response(ClientResponse):

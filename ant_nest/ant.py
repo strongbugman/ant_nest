@@ -47,7 +47,7 @@ class Ant(abc.ABC):
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.session: aiohttp.ClientSession = ClientSession(
-            response_class=self.response_cls, request_class=self.request_cls,
+            response_class=self.response_cls,
             connector=aiohttp.TCPConnector(
                 limit=self.connection_limit,
                 enable_cleanup_closed=True,
