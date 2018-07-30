@@ -8,7 +8,6 @@ import shutil
 import asyncio
 from importlib import import_module
 from pkgutil import iter_modules
-from traceback import format_exc
 import signal
 import functools
 from asyncio.queues import QueueEmpty
@@ -46,29 +45,33 @@ def get_ants(paths: typing.List[str]) -> typing.Dict[str, typing.Type[Ant]]:
     return results
 
 
-def shutdown_ant(ant: Ant):
+def shutdown_ant(ants: typing.List[Ant]):
     global __signal_count
+    ant_names = '+'.join([ant.name for ant in ants])
+
     if __signal_count == 1:
         print('Receive shutdown command twice, ant {:s} shutdown '
-              'immediately'.format(ant.name))
+              'immediately'.format(ant_names))
         sys.exit()
     __signal_count += 1
 
     print('Graceful shutdown {:s}...Try again to force '
-          'shutdown'.format(ant.name))
+          'shutdown'.format(ant_names))
 
     # drop waiting coroutines
-    ant._is_closed = True
-    while True:
-        try:
-            ant._queue.get_nowait()
-        except QueueEmpty:
-            break
+    for ant in ants:
+        ant._is_closed = True
+        while True:
+            try:
+                ant._queue.get_nowait()
+            except QueueEmpty:
+                break
 
 
 def main(args=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--ant', help='ant name')
+    parser.add_argument('-a', '--ants',
+                        help='ant names, multi name split by space')
     parser.add_argument('-l', '--list', help='list ants', action='store_true')
     parser.add_argument('-v', '--version', help='get package version',
                         action='store_true')
@@ -100,28 +103,30 @@ def main(args=None):
         ants = get_ants(settings.ANT_PACKAGES)
     except Exception as e:
         print('There is a problem with finding and loading ants:')
-        print(format_exc())
-        exit(-1)
+        raise e
+
     if args.list:
         if len(ants) == 0:
             print('Can`t find any ant from ' + ','.join(settings.ANT_PACKAGES))
             exit(-1)
         else:
             print('\n'.join(ants.keys()))
-    elif args.ant is not None:
-        ant_name = args.ant
-        if ant_name in ants:
-            loop = asyncio.get_event_loop()
-            ant = ants[ant_name]()
+    elif args.ants is not None:
+        selected_ants: typing.List[Ant] = []
+        for name in args.ants.split('+'):
+            if name in ants:
+                selected_ants.append(ants[name]())
+            else:
+                print('Can not find ant by the name "{:s}"'.format(name))
+                exit(-1)
 
-            loop.add_signal_handler(signal.SIGINT,
-                                    functools.partial(shutdown_ant, ant))
-            loop.add_signal_handler(signal.SIGTERM,
-                                    functools.partial(shutdown_ant, ant))
-            asyncio.get_event_loop().run_until_complete(ant.main())
-        else:
-            print('Can not find ant by the name "{:s}"'.format(ant_name))
-            exit(-1)
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGINT,
+                                functools.partial(shutdown_ant, selected_ants))
+        loop.add_signal_handler(signal.SIGTERM,
+                                functools.partial(shutdown_ant, selected_ants))
+        loop.run_until_complete(
+            asyncio.gather(*(ant.main() for ant in selected_ants)))
 
 
 if __name__ == '__main__':  # pragma: no cover

@@ -144,12 +144,12 @@ def test_cli_get_ants():
 def test_cli_shutdown():
     ant = CliAnt()
     ant._queue.put_nowait(object())
-    cli.shutdown_ant(ant)
+    cli.shutdown_ant([ant])
     assert ant._is_closed
     assert ant._queue.qsize() == 0
 
     with pytest.raises(SystemExit):
-        cli.shutdown_ant(ant)
+        cli.shutdown_ant([ant])
 
 
 def test_cli():
@@ -165,7 +165,7 @@ def test_cli():
     sys.modules['settings'] = settings
 
     settings.ANT_PACKAGES = ['NoAnts']
-    with pytest.raises(SystemExit):  # can`t import NoAnts
+    with pytest.raises(ModuleNotFoundError):  # can`t import NoAnts
         cli.main(['-l'])
 
     settings.ANT_PACKAGES = ['ant_nest.things']
