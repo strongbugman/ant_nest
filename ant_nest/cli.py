@@ -11,6 +11,7 @@ from pkgutil import iter_modules
 import signal
 import functools
 from asyncio.queues import QueueEmpty
+import fnmatch
 
 from .ant import Ant
 from . import __version__
@@ -114,11 +115,12 @@ def main(args=None):
     elif args.ants is not None:
         selected_ants: typing.List[Ant] = []
         for name in args.ants.split('+'):
-            if name in ants:
-                selected_ants.append(ants[name]())
-            else:
+            temp = fnmatch.filter(ants.keys(), name)
+            if len(temp) == 0:
                 print('Can not find ant by the name "{:s}"'.format(name))
                 exit(-1)
+            else:
+                selected_ants.extend([ants[k]() for k in temp])
 
         loop = asyncio.get_event_loop()
         loop.add_signal_handler(signal.SIGINT,
