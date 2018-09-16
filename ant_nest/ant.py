@@ -136,6 +136,8 @@ class Ant(abc.ABC):
                 await obj
 
     async def close(self) -> None:
+        await self.wait_scheduled_coroutines()
+
         for pipeline in itertools.chain(self.item_pipelines,
                                         self.response_pipelines,
                                         self.request_pipelines):
@@ -143,7 +145,6 @@ class Ant(abc.ABC):
             if asyncio.iscoroutine(obj):
                 await obj
 
-        await self.wait_scheduled_coroutines()
         await self.session.close()
 
         self._is_closed = True

@@ -424,3 +424,29 @@ async def test_timeout():
 
     with pytest.raises(asyncio.TimeoutError):
         await timeout_wrapper(bar(), timeout=0.2)
+
+
+@pytest.mark.asyncio
+async def test_ant_main():
+    """Pipeline closed before scheduled coroutines done?"""
+    class TestPipeline(Pipeline):
+        awake = True
+
+        async def on_spider_close(self):
+            self.awake = False
+
+    class TestAnt(Ant):
+        item_pipelines = [TestPipeline()]
+
+        in_error = False
+
+        async def run(self):
+            self.schedule_coroutine(self.long_cor())
+
+        async def long_cor(self):
+            await asyncio.sleep(1)
+            self.in_error = not self.item_pipelines[0].awake
+
+    ant = TestAnt()
+    await ant.main()
+    assert not ant.in_error
