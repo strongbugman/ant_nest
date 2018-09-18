@@ -129,7 +129,7 @@ class RequestRandomUserAgentPipeline(Pipeline):
     def _format(self, pattern: str) -> str:
         """format system or browser pattern string"""
         kv = {}
-        keys = re.findall('{(\S+?)}', pattern)
+        keys = re.findall(r'{(\S+?)}', pattern)
 
         for key in keys:
             kv[key] = self.choice(self.FORMAT_VARS[key])
