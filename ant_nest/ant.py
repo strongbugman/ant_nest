@@ -38,7 +38,7 @@ class Ant(abc.ABC):
     request_max_redirects = 10
     request_allow_redirects = True
     response_in_stream = False
-    connection_limit = 100  # see "TCPConnector" in "aiohttp"
+    connection_limit = 10  # see "TCPConnector" in "aiohttp"
     connection_limit_per_host = 0
     concurrent_limit = 100
 
