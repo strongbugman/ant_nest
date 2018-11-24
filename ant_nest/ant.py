@@ -350,11 +350,12 @@ class Ant(abc.ABC):
                     aiohttp.BasicAuth.from_url(req.proxy).encode()
 
         # cookies in headers, params in url
-        req_kwargs = dict(method=req.method, url=req.url, headers=req.headers,
+        req_kwargs = dict(headers=req.headers,
                           data=req.data, timeout=req.timeout, proxy=req.proxy,
                           max_redirects=self.request_max_redirects,
                           allow_redirects=self.request_allow_redirects)
-        response = await self.session._request(**req_kwargs)
+        response = await self.session._request(
+            req.method, req.url, **req_kwargs)
 
         if not req.response_in_stream:
             await response.read()

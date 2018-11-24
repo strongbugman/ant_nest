@@ -20,7 +20,7 @@ setup(
                 'with async',
     long_description=open('README.rst').read(),
     author='Bruce Wu',
-    author_email='1wumingyu1@gmail.com',
+    author_email='strongbugman@gmail.com',
     license='LGPL',
     classifiers=[
         'Environment :: Console',
