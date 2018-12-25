@@ -9,8 +9,9 @@ requires = ['aiohttp>=3.3.0', 'lxml>=3.7.0',
             'jpath>=1.6', 'tenacity>=4.8.0',
             'ujson>=1.3.4', 'aiofiles>=0.3.1', 'typing_extensions>=3.6'
             ]
-tests_require = ['pytest>=3.3.1', 'pytest-asyncio>=0.8.0', 'pytest-cov>=2.5.1']
-setup_require = ['pytest-runner>=3.0']
+tests_requires = ['pytest>=3.3.1', 'pytest-asyncio>=0.8.0',
+                  'pytest-cov>=2.5.1']
+setup_requires = ['pytest-runner>=3.0']
 
 setup(
     name="ant_nest",
@@ -34,6 +35,6 @@ setup(
     entry_points={
         'console_scripts': ['ant_nest = ant_nest.cli:main']
     },
-    setup_requires=setup_require,
-    tests_require=tests_require
+    setup_requires=setup_requires,
+    tests_require=tests_requires
 )
