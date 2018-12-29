@@ -6,10 +6,10 @@ import asyncio
 from ant_nest import ExceptionFilter
 
 # your ant`s class modules or packages
-ANT_PACKAGES = ['ants']
-ANT_ENV = os.getenv('ANT_ENV', 'development')
+ANT_PACKAGES = ["ants"]
+ANT_ENV = os.getenv("ANT_ENV", "development")
 
-if ANT_ENV in ('development', 'testing'):
+if ANT_ENV in ("development", "testing"):
     logging.basicConfig(level=logging.DEBUG)
     asyncio.get_event_loop().set_debug(True)
 else:

@@ -10,7 +10,7 @@ destroy_test_env:
 	docker stop test_httpbin test_squid
 
 test:
-	flake8 ant_nest
+	black . -l 79
 	python setup.py test --addopts='--cov ant_nest --cov-report term-missing'
 
 tag:

@@ -5,12 +5,12 @@ import asyncio
 import async_timeout
 
 
-__all__ = ['timeout_wrapper']
+__all__ = ["timeout_wrapper"]
 
 
 def timeout_wrapper(
-        coro_or_func: typing.Union[typing.Coroutine, typing.Callable],
-        timeout: typing.Union[float, int]
+    coro_or_func: typing.Union[typing.Coroutine, typing.Callable],
+    timeout: typing.Union[float, int],
 ) -> typing.Union[typing.Coroutine, typing.Callable]:
     """Add timeout limit to coroutine or coroutine function"""
     is_coroutinefunction = asyncio.iscoroutinefunction(coro_or_func)

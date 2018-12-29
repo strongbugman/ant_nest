@@ -15,13 +15,13 @@ from .test_things import fake_response
 @pytest.mark.asyncio
 async def test_pipeline():
     pl = Pipeline()
-    await pl.process(Request('GET', URL('https://test.com')))
+    await pl.process(Request("GET", URL("https://test.com")))
 
 
 def test_response_filter_error_pipeline():
     pl = ResponseFilterErrorPipeline()
-    res = fake_response(b'')
-    err_res = fake_response(b'')
+    res = fake_response(b"")
+    err_res = fake_response(b"")
     res.status = 200
     err_res.status = 403
     assert res is pl.process(res)
@@ -31,7 +31,7 @@ def test_response_filter_error_pipeline():
 
 def test_request_duplicate_filter_pipeline():
     pl = RequestDuplicateFilterPipeline()
-    req = Request('GET', URL('http://test.com'))
+    req = Request("GET", URL("http://test.com"))
     assert pl.process(req) is req
     with pytest.raises(ThingDropped):
         pl.process(req)
@@ -41,33 +41,33 @@ def test_item_print_pipeline(item_cls):
     pl = ItemPrintPipeline()
     item = item_cls()
     item.count = 3
-    item.info = 'hi'
+    item.info = "hi"
     assert pl.process(item) is item
 
 
 def test_item_filed_replace_pipeline(item_cls):
-    pl = ItemFieldReplacePipeline(['info'])
+    pl = ItemFieldReplacePipeline(["info"])
     item = item_cls()
-    item.info = 'hi\n,\t\r ant\n'
+    item.info = "hi\n,\t\r ant\n"
     pl.process(item)
-    assert item.info == 'hi, ant'
+    assert item.info == "hi, ant"
 
 
 @pytest.mark.asyncio
 async def test_item_base_file_dump_pipeline():
     pl = ItemBaseFileDumpPipeline()
-    await pl.dump('/dev/null', 'Hello World')
-    await pl.dump('/dev/null', b'Hello World')
-    await pl.dump('/dev/null', io.StringIO('Hello World'))
-    await pl.dump('/dev/null', io.BytesIO(b'Hello World'))
-    await pl.dump('/dev/null', open('./tests/test.html'), buffer_size=4)
-    async with aiofiles.open('./tests/test.html') as f:
-        await pl.dump('/dev/null', f)
-    async with aiofiles.open('./tests/test.html', 'rb') as f:
-        await pl.dump('/dev/null', f, buffer_size=4)
+    await pl.dump("/dev/null", "Hello World")
+    await pl.dump("/dev/null", b"Hello World")
+    await pl.dump("/dev/null", io.StringIO("Hello World"))
+    await pl.dump("/dev/null", io.BytesIO(b"Hello World"))
+    await pl.dump("/dev/null", open("./tests/test.html"), buffer_size=4)
+    async with aiofiles.open("./tests/test.html") as f:
+        await pl.dump("/dev/null", f)
+    async with aiofiles.open("./tests/test.html", "rb") as f:
+        await pl.dump("/dev/null", f, buffer_size=4)
 
     with pytest.raises(ValueError):
-        await pl.dump('/dev/null', None)
+        await pl.dump("/dev/null", None)
 
 
 @pytest.mark.asyncio
@@ -77,42 +77,42 @@ async def test_item_json_dump_pipeline(item_cls):
     item.count = 1
     assert pl.process(item) is item
     item = item_cls()
-    item.info = 'hi'
+    item.info = "hi"
     pl.process(item)
     await pl.on_spider_close()
 
     # clean file
-    ci = os.getenv('TEST_HOST', 'localhost')
-    if ci == 'localhost':
-        os.remove('./Item.json')
+    ci = os.getenv("TEST_HOST", "localhost")
+    if ci == "localhost":
+        os.remove("./Item.json")
 
 
 def test_request_user_agent_pipeline():
-    pl = RequestUserAgentPipeline(user_agent='ant')
-    req = Request('GET', URL('https://www.hi.com'))
+    pl = RequestUserAgentPipeline(user_agent="ant")
+    req = Request("GET", URL("https://www.hi.com"))
     assert pl.process(req) is req
-    assert req.headers['User-Agent'] == 'ant'
+    assert req.headers["User-Agent"] == "ant"
 
-    req.headers['User-Agent'] = 'custom'
-    assert pl.process(req).headers['User-Agent'] == 'custom'
+    req.headers["User-Agent"] = "custom"
+    assert pl.process(req).headers["User-Agent"] == "custom"
 
 
 def test_request_random_user_agent_pipeline():
     pl = RequestRandomUserAgentPipeline()
-    req = Request('GET', URL('https://www.hi.com'))
+    req = Request("GET", URL("https://www.hi.com"))
     assert pl.process(req) is req
-    assert req.headers.get('User-Agent') is not None
+    assert req.headers.get("User-Agent") is not None
 
-    req.headers['User-Agent'] = 'custom'
-    assert pl.process(req).headers['User-Agent'] == 'custom'
-
-    with pytest.raises(ValueError):
-        RequestRandomUserAgentPipeline(system='something')
+    req.headers["User-Agent"] = "custom"
+    assert pl.process(req).headers["User-Agent"] == "custom"
 
     with pytest.raises(ValueError):
-        RequestRandomUserAgentPipeline(browser='something')
+        RequestRandomUserAgentPipeline(system="something")
 
-    pl = RequestRandomUserAgentPipeline(system='UnixLike', browser='Firefox')
+    with pytest.raises(ValueError):
+        RequestRandomUserAgentPipeline(browser="something")
+
+    pl = RequestRandomUserAgentPipeline(system="UnixLike", browser="Firefox")
     user_agent = pl.create()
-    assert 'X11' in user_agent
-    assert 'Firefox' in user_agent
+    assert "X11" in user_agent
+    assert "Firefox" in user_agent

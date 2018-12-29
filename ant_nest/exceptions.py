@@ -2,8 +2,12 @@ import logging
 import typing
 
 
-__all__ = ['ThingDropped', 'ItemExtractError', 'ItemGetValueError',
-           'ExceptionFilter']
+__all__ = [
+    "ThingDropped",
+    "ItemExtractError",
+    "ItemGetValueError",
+    "ExceptionFilter",
+]
 
 
 class ThingDropped(Exception):
@@ -23,9 +27,11 @@ class ExceptionFilter(logging.Filter):
     """
 
     def __init__(
-            self,
-            exceptions: typing.Sequence[
-                typing.Type[Exception]] = (ThingDropped, ), *args, **kwargs):
+        self,
+        exceptions: typing.Sequence[typing.Type[Exception]] = (ThingDropped,),
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.exceptions = exceptions
 
