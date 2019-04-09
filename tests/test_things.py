@@ -90,7 +90,7 @@ def test_extract():
     assert item.paragraph == "test"
     assert item.title == "Test html"
     # raise exception it can`t find one key
-    item_extractor.add_pattern("regex", "test", "test(\d+)test")
+    item_extractor.add_pattern("regex", "test", r"test(\d+)test")
     with pytest.raises(ItemExtractError):
         item_extractor.extract(response)
     # with exception for multiple result
@@ -115,11 +115,9 @@ def test_extract():
     with open("./tests/test.html", "rb") as f:
         response = fake_response(f.read())
         response.get_text(encoding="utf-8")
-    item_nest_extractor = ItemNestExtractor(
-        "xpath", '//div[@id="nest"]/div', Item
-    )
+    item_nest_extractor = ItemNestExtractor("xpath", '//div[@id="nest"]/div', Item)
     item_nest_extractor.add_pattern("xpath", "xpath", "./p/text()")
-    item_nest_extractor.add_pattern("regex", "regex", "regex(\d+)</")
+    item_nest_extractor.add_pattern("regex", "regex", r"regex(\d+)</")
     temp = 1
     for item in item_nest_extractor.extract_items(response):
         assert item.xpath == str(temp)
@@ -139,20 +137,13 @@ def test_extract():
         == "test"
     )
     assert (
-        ItemExtractor.extract_value(
-            "xpath", "/html/body/div/p/text()", response
-        )
+        ItemExtractor.extract_value("xpath", "/html/body/div/p/text()", response)
         == "test"
     )
-    assert (
-        ItemExtractor.extract_value("xpath", "//a/text()", "<a>test</a>")
-        == "test"
-    )
+    assert ItemExtractor.extract_value("xpath", "//a/text()", "<a>test</a>") == "test"
     assert ItemExtractor.extract_value("jpath", "a", {"a": 1}) == 1
     assert ItemExtractor.extract_value("jpath", "a", '{"a": 1}') == 1
-    assert (
-        ItemExtractor.extract_value("regex", "(\d+)", "I have 2 apples") == "2"
-    )
+    assert ItemExtractor.extract_value("regex", "(\d+)", "I have 2 apples") == "2"
     assert ItemExtractor.extract_value("jpath", "a", {"a": None}) is None
     assert ItemExtractor.extract_value("jpath", "a", {}, default=1) == 1
     with pytest.raises(ItemExtractError):
@@ -203,9 +194,9 @@ def test_cli():
         cli.main(["-a" "FakeAnt"])
         cli.main(["-l"])
 
-    with pytest.raises(SystemExit), mock.patch(
-        "os.mkdir", lambda x: None
-    ), mock.patch("shutil.copyfile", lambda *args: None):
+    with pytest.raises(SystemExit), mock.patch("os.mkdir", lambda x: None), mock.patch(
+        "shutil.copyfile", lambda *args: None
+    ):
         cli.main(["-c" "."])
 
     cli.main(["-a" "tests.test_things.CliAnt"])

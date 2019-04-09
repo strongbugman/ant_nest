@@ -11,14 +11,7 @@ import aiofiles
 from aiohttp.http import SERVER_SOFTWARE
 from aiohttp import hdrs
 
-from .things import (
-    Things,
-    Response,
-    Request,
-    Item,
-    set_value_to_item,
-    get_value_from_item,
-)
+from .things import Response, Request, Item, set_value_to_item, get_value_from_item
 from .exceptions import ThingDropped
 
 
@@ -26,13 +19,13 @@ class Pipeline:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def on_spider_open(self) -> None:
+    def on_spider_open(self) -> typing.Optional[typing.Awaitable]:
         """Call when ant open, this method can be coroutine function"""
 
-    async def on_spider_close(self) -> None:
+    def on_spider_close(self) -> typing.Optional[typing.Awaitable]:
         """Call when ant close, this method can be coroutine function"""
 
-    async def process(self, thing: Things) -> Things:
+    def process(self, thing: typing.Any) -> typing.Any:
         """Process things, this method can be coroutine function
         Raise ThingDropped when drop one thing
 
@@ -43,7 +36,7 @@ class Pipeline:
 
 # Response pipelines
 class ResponseFilterErrorPipeline(Pipeline):
-    def process(self, thing: Response) -> typing.Union[Things, Exception]:
+    def process(self, thing: Response) -> Response:
         if thing.status >= 400:
             raise ThingDropped("Response - {:s}".format(str(thing)))
         else:
@@ -56,7 +49,7 @@ class RequestDuplicateFilterPipeline(Pipeline):
         self.__request_urls = set()
         super().__init__()
 
-    def process(self, thing: Request) -> typing.Union[Things, Exception]:
+    def process(self, thing: Request) -> Request:
         if thing.url in self.__request_urls:
             raise ThingDropped("Request duplicate!")
         else:
@@ -100,7 +93,7 @@ class RequestRandomUserAgentPipeline(Pipeline):
         "Chrome": "AppleWebKit/{webkit_version} (KHTML, like Gecko) "
         "Chrome/{chrome_version} Safari/{safari_version2}",
     }
-    FORMAT_VARS = {
+    FORMAT_VARS: typing.Dict[str, typing.Tuple[str, ...]] = {
         "unix-like_os": ("Linux", "FreeBSD"),
         "cpu_type": ("x86_64", "i386", "amd64"),
         "macos_version": (
@@ -112,26 +105,9 @@ class RequestRandomUserAgentPipeline(Pipeline):
             "10_13_3",
         ),
         "windows_version": ("5_0", "5_1", "5_2", "6_0", "6_1", "10_0"),
-        "android_version": (
-            "4_4",
-            "5_0",
-            "5_1",
-            "6_0",
-            "6_1",
-            "7_0",
-            "7_1",
-            "8_0",
-        ),
+        "android_version": ("4_4", "5_0", "5_1", "6_0", "6_1", "7_0", "7_1", "8_0"),
         "ios_driver": ("iPone", "iPod", "iPad"),
-        "ios_version": (
-            "6_0",
-            "7_0",
-            "8_1",
-            "9_2",
-            "10_3",
-            "10_2_3",
-            "11_3_3",
-        ),
+        "ios_version": ("6_0", "7_0", "8_1", "9_2", "10_3", "10_2_3", "11_3_3"),
         "firefox_version": ("27.3", "28.0", "31.0", "40.1"),
         "webkit_version": ("533.18.1", "533.19.4", "533.20.25", "534.55.3"),
         "safari_version": ("4.0.1", "5.0.4", "5.1.3", "6.0", "7.0.3"),
@@ -146,13 +122,9 @@ class RequestRandomUserAgentPipeline(Pipeline):
 
     def __init__(self, system: str = "random", browser: str = "random"):
         if system != "random" and system not in self.SYSTEM_FORMATS.keys():
-            raise ValueError(
-                "The system {:s} is not supported!".format(system)
-            )
+            raise ValueError("The system {:s} is not supported!".format(system))
         if browser != "random" and browser not in self.BROWSER_FORMATS.keys():
-            raise ValueError(
-                "The browser {:s} is not supported!".format(browser)
-            )
+            raise ValueError("The browser {:s} is not supported!".format(browser))
 
         self.system = system
         self.browser = browser
@@ -188,8 +160,7 @@ class RequestRandomUserAgentPipeline(Pipeline):
             ]
 
         return self.USER_AGENT_FORMAT.format(
-            system=self._format(system_format),
-            browser=self._format(browser_format),
+            system=self._format(system_format), browser=self._format(browser_format)
         )
 
     def process(self, thing: Request) -> Request:
@@ -244,15 +215,12 @@ class ItemFieldReplacePipeline(Pipeline):
 class ItemBaseFileDumpPipeline(Pipeline):
     @classmethod
     async def dump(
-        cls,
-        file_path: str,
-        data: typing.Union[typing.AnyStr, typing.IO],
-        buffer_size: int = 1024 * 1024,
+        cls, file_path: str, data: typing.Any, buffer_size: int = 1024 * 1024
     ) -> None:
         """Dump data(binary or text, stream or normal, async or not) to disk file.
         typing.IO data will be closed.
         """
-        chunk: typing.Optional[typing.AnyStr] = None
+        chunk = None
         if isinstance(data, str):
             file_mode = "w"
         elif isinstance(data, bytes):
@@ -268,16 +236,13 @@ class ItemBaseFileDumpPipeline(Pipeline):
                 file_mode = "wb"
         else:
             raise ValueError(
-                "The type {:s} is not supported".format(
-                    type(data).__class__.__name__
-                )
+                "The type {:s} is not supported".format(type(data).__class__.__name__)
             )
 
         async with aiofiles.open(file_path, file_mode) as file:
             if chunk is not None:  # in streaming
                 await file.write(chunk)
                 while True:
-
                     chunk = data.read(buffer_size)
                     if asyncio.iscoroutine(chunk):
                         chunk = await chunk
@@ -298,28 +263,21 @@ class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
     """Dump item to json during pipeline closing"""
 
     def __init__(
-        self,
-        *,
-        to_dict: typing.Callable[[Item], typing.Dict],
-        file_dir: str = "."
+        self, *, to_dict: typing.Callable[[Item], typing.Dict], file_dir: str = "."
     ):
         super().__init__()
         self.file_dir = file_dir
-        self.data: typing.DefaultDict[
-            str, typing.List[typing.Dict]
-        ] = defaultdict(list)
+        self.data: typing.DefaultDict[str, typing.List[typing.Dict]] = defaultdict(list)
         self.to_dict = to_dict
 
     def process(self, thing: Item) -> Item:
         self.data[thing.__class__.__name__].append(self.to_dict(thing))
         return thing
 
-    async def on_spider_close(self) -> None:
+    async def on_spider_close(self):
         for file_name, data in self.data.items():
             data = ujson.dumps(data)
-            await self.dump(
-                os.path.join(self.file_dir, file_name + ".json"), data
-            )
+            await self.dump(os.path.join(self.file_dir, file_name + ".json"), data)
 
 
 __all__ = [var for var in vars().keys() if "Pipeline" in var]

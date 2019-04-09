@@ -1,3 +1,4 @@
 ignore:
   - "tests/"
   - "setup.py"
+  - "*settings_example.py"

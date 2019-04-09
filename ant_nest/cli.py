@@ -25,7 +25,7 @@ def get_ants(paths: typing.List[str]) -> typing.Dict[str, typing.Type[Ant]]:
     results = {}
     # get all modules from packages and subpackages
     for path in paths:
-        module = import_module(path)
+        module: typing.Any = import_module(path)
         modules.append(module)
         if hasattr(module, "__path__"):
             package_path = []
@@ -40,11 +40,7 @@ def get_ants(paths: typing.List[str]) -> typing.Dict[str, typing.Type[Ant]]:
     # get and sift ant class obj from modules
     for module in modules:
         for name, obj in inspect.getmembers(module):
-            if (
-                isinstance(obj, type)
-                and issubclass(obj, Ant)
-                and obj is not Ant
-            ):
+            if isinstance(obj, type) and issubclass(obj, Ant) and obj is not Ant:
                 results[module.__name__ + "." + obj.__name__] = obj
     return results
 
@@ -61,10 +57,7 @@ def shutdown_ant(ants: typing.List[Ant]):
         sys.exit()
     __signal_count += 1
 
-    print(
-        "Graceful shutdown {:s}...Try again to force "
-        "shutdown".format(ant_names)
-    )
+    print("Graceful shutdown {:s}...Try again to force " "shutdown".format(ant_names))
 
     # drop waiting coroutines
     for ant in ants:
@@ -78,9 +71,7 @@ def shutdown_ant(ants: typing.List[Ant]):
 
 def main(args=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-a", "--ants", help="ant names, multi name split by space"
-    )
+    parser.add_argument("-a", "--ants", help="ant names, multi name split by space")
     parser.add_argument("-l", "--list", help="list ants", action="store_true")
     parser.add_argument(
         "-v", "--version", help="get package version", action="store_true"
@@ -97,12 +88,11 @@ def main(args=None):
 
         try:
             os.mkdir(args.project)
-        except FileExistsError:
-            pass
+        except FileExistsError:  # pragma: no cover
+            raise Exception(f"The project {args.project} exists!")
         os.mkdir(os.path.join(args.project, "ants"))
         shutil.copyfile(
-            _settings_example.__file__,
-            os.path.join(args.project, "settings.py"),
+            _settings_example.__file__, os.path.join(args.project, "settings.py")
         )
         exit()
     # in one project
@@ -141,9 +131,7 @@ def main(args=None):
         loop.add_signal_handler(
             signal.SIGTERM, functools.partial(shutdown_ant, selected_ants)
         )
-        loop.run_until_complete(
-            asyncio.gather(*(ant.main() for ant in selected_ants))
-        )
+        loop.run_until_complete(asyncio.gather(*(ant.main() for ant in selected_ants)))
 
 
 if __name__ == "__main__":  # pragma: no cover

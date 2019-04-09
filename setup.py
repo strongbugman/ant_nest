@@ -3,7 +3,11 @@ from setuptools import setup, find_packages
 import re
 
 with open("ant_nest/__init__.py", "rt", encoding="utf8") as f:
-    version = re.search(r"__version__ = \"(.*?)\"", f.read()).group(1)
+    match = re.search(r"__version__ = \"(.*?)\"", f.read())
+    if match:
+        version = match.group(1)
+    else:
+        raise Exception("Version not found!")
 
 requires = [
     "aiohttp>=3.3.0",
@@ -14,12 +18,8 @@ requires = [
     "aiofiles>=0.3.1",
     "typing_extensions>=3.6",
 ]
-tests_requires = [
-    "pytest>=3.3.1",
-    "pytest-asyncio>=0.8.0",
-    "pytest-cov>=2.5.1",
-]
-setup_requires = ["pytest-runner>=3.0", "black"]
+tests_requires = ["pytest>=3.3.1", "pytest-asyncio>=0.8.0", "pytest-cov>=2.5.1"]
+setup_requires = ["pytest-runner>=3.0"]
 
 setup(
     name="ant_nest",

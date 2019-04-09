@@ -10,7 +10,6 @@ from asyncio.queues import Queue, QueueEmpty
 from itertools import islice
 
 import aiohttp
-from aiohttp.client import DEFAULT_TIMEOUT
 from aiohttp import ClientSession
 from yarl import URL
 from tenacity import retry
@@ -18,8 +17,8 @@ from tenacity.retry import retry_if_result, retry_if_exception_type
 from tenacity.wait import wait_fixed
 from tenacity.stop import stop_after_attempt
 
-from .pipelines import Pipeline
-from .things import Request, Response, Item, Things
+from .pipelines import Pipeline, ItemPrintPipeline
+from .things import Request, Response, Item
 from .exceptions import ThingDropped
 
 __all__ = ["Ant", "CliAnt"]
@@ -31,7 +30,7 @@ class Ant(abc.ABC):
     item_pipelines: typing.List[Pipeline] = []
     request_cls = Request
     response_cls = Response
-    request_timeout = DEFAULT_TIMEOUT.total
+    request_timeout = 60
     request_retries = 3
     request_retry_delay = 5
     request_proxies: typing.List[typing.Union[str, URL]] = []
@@ -42,9 +41,7 @@ class Ant(abc.ABC):
     connection_limit_per_host = 0
     concurrent_limit = 100
 
-    def __init__(
-        self, loop: typing.Optional[asyncio.AbstractEventLoop] = None
-    ):
+    def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None):
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.session: aiohttp.ClientSession = ClientSession(
@@ -56,17 +53,17 @@ class Ant(abc.ABC):
             ),
         )
         # coroutine`s concurrency support
-        self._queue = Queue(loop=self.loop)
-        self._done_queue = Queue(loop=self.loop)
+        self._queue: Queue = Queue(loop=self.loop)
+        self._done_queue: Queue = Queue(loop=self.loop)
         self._running_count = 0
         self._is_closed = False
         # report var
-        self._reports: typing.DefaultDict[
-            str, typing.List[int, int]
-        ] = defaultdict(lambda: [0, 0])
-        self._drop_reports: typing.DefaultDict[
-            str, typing.List[int, int]
-        ] = defaultdict(lambda: [0, 0])
+        self._reports: typing.DefaultDict[str, typing.List[int]] = defaultdict(
+            lambda: [0, 0]
+        )
+        self._drop_reports: typing.DefaultDict[str, typing.List[int]] = defaultdict(
+            lambda: [0, 0]
+        )
         self._start_time = time.time()
         self._last_time = self._start_time
         self._report_slot = 60  # report once after one minute by default
@@ -90,7 +87,7 @@ class Ant(abc.ABC):
             typing.Union[typing.AnyStr, typing.Dict, typing.IO]
         ] = None,
         proxy: typing.Optional[typing.Union[str, URL]] = None,
-        timeout: typing.Optional[typing.Union[int, float]] = None,
+        timeout: typing.Optional[float] = None,
         retries: typing.Optional[int] = None,
         response_in_stream: typing.Optional[bool] = None,
     ) -> Response:
@@ -107,32 +104,30 @@ class Ant(abc.ABC):
         if response_in_stream is None:
             response_in_stream = self.response_in_stream
 
-        req = self.request_cls(
-            method,
-            url,
-            timeout=timeout,
-            params=params,
-            headers=headers,
-            cookies=cookies,
-            data=data,
-            proxy=proxy,
-            response_in_stream=response_in_stream,
-        )
-        req = await self._handle_thing_with_pipelines(
-            req, self.request_pipelines
+        req: Request = await self._handle_thing_with_pipelines(
+            self.request_cls(
+                method,
+                url,
+                timeout=timeout,
+                params=params,
+                headers=headers,
+                cookies=cookies,
+                data=data,
+                proxy=proxy,
+                response_in_stream=response_in_stream,
+            ),
+            self.request_pipelines,
         )
         self.report(req)
 
         if retries > 0:
-            res = await self.make_retry_decorator(
-                retries, self.request_retry_delay
-            )(self._request)(req)
+            res = await self.make_retry_decorator(retries, self.request_retry_delay)(
+                self._request
+            )(req)
         else:
             res = await self._request(req)
 
-        res = await self._handle_thing_with_pipelines(
-            res, self.response_pipelines
-        )
+        res = await self._handle_thing_with_pipelines(res, self.response_pipelines)
         self.report(res)
         return res
 
@@ -144,24 +139,20 @@ class Ant(abc.ABC):
     async def open(self) -> None:
         self.logger.info("Opening")
         for pipeline in itertools.chain(
-            self.item_pipelines,
-            self.response_pipelines,
-            self.request_pipelines,
+            self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
             obj = pipeline.on_spider_open()
-            if asyncio.iscoroutine(obj):
+            if obj and asyncio.iscoroutine(obj):
                 await obj
 
     async def close(self) -> None:
         await self.wait_scheduled_tasks()
 
         for pipeline in itertools.chain(
-            self.item_pipelines,
-            self.response_pipelines,
-            self.request_pipelines,
+            self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
             obj = pipeline.on_spider_close()
-            if asyncio.iscoroutine(obj):
+            if obj and asyncio.iscoroutine(obj):
                 await obj
 
         await self.session.close()
@@ -241,10 +232,7 @@ class Ant(abc.ABC):
             self.logger.warning("This ant has be closed!")
             return
 
-        if (
-            self.concurrent_limit == -1
-            or self._running_count < self.concurrent_limit
-        ):
+        if self.concurrent_limit == -1 or self._running_count < self.concurrent_limit:
             self._running_count += 1
             asyncio.ensure_future(coroutine, loop=self.loop).add_done_callback(
                 _done_callback
@@ -277,8 +265,8 @@ class Ant(abc.ABC):
         limit = self.concurrent_limit if limit is None else limit
 
         coros = iter(coros)
-        queue = Queue(loop=self.loop)
-        todo = []
+        queue: Queue = Queue(loop=self.loop)
+        todo: typing.List[asyncio.Future] = []
 
         def _done_callback(f):
             queue.put_nowait(f)
@@ -327,7 +315,7 @@ class Ant(abc.ABC):
                         '"as_completed_with_async"'.format(str(e))
                     )
 
-    def report(self, thing: Things, dropped: bool = False) -> None:
+    def report(self, thing: typing.Any, dropped: bool = False) -> None:
         now_time = time.time()
         if now_time - self._last_time > self._report_slot:
             self._last_time = now_time
@@ -356,8 +344,8 @@ class Ant(abc.ABC):
         counts[1] += 1
 
     async def _handle_thing_with_pipelines(
-        self, thing: Things, pipelines: typing.List[Pipeline]
-    ) -> Things:
+        self, thing: typing.Any, pipelines: typing.List[Pipeline]
+    ) -> typing.Any:
         """Process thing one by one, break the process chain when get
         exception.
         """
@@ -378,10 +366,9 @@ class Ant(abc.ABC):
         if req.proxy is not None:
             # proxy auth not work in one session with many requests,
             # add auth header to fix it
-            if req.proxy.scheme == "http" and req.proxy.user is not None:
-                req.headers[
-                    aiohttp.hdrs.PROXY_AUTHORIZATION
-                ] = aiohttp.BasicAuth.from_url(req.proxy).encode()
+            auth = aiohttp.BasicAuth.from_url(req.proxy)
+            if req.proxy.scheme == "http" and auth is not None:
+                req.headers[aiohttp.hdrs.PROXY_AUTHORIZATION] = auth.encode()
 
         # cookies in headers, params in url
         req_kwargs = dict(
@@ -392,7 +379,7 @@ class Ant(abc.ABC):
             max_redirects=self.request_max_redirects,
             allow_redirects=self.request_allow_redirects,
         )
-        response = await self.session._request(
+        response: typing.Any = await self.session._request(
             req.method, req.url, **req_kwargs
         )
 

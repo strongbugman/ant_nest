@@ -7,8 +7,7 @@ class GithubAnt(Ant):
 
     item_pipelines = [
         ItemFieldReplacePipeline(
-            ("meta_content", "star", "fork"),
-            excess_chars=("\r", "\n", "\t", "  "),
+            ("meta_content", "star", "fork"), excess_chars=("\r", "\n", "\t", "  ")
         )
     ]
     concurrent_limit = 1  # save the website`s and your bandwidth!
@@ -32,9 +31,7 @@ class GithubAnt(Ant):
             default="Not found!",
         )
         item["star"] = ItemExtractor.extract_value(
-            "xpath",
-            '//a[@class="social-count js-social-count"]/text()',
-            response,
+            "xpath", '//a[@class="social-count js-social-count"]/text()', response
         )
         item["fork"] = ItemExtractor.extract_value(
             "xpath", '//a[@class="social-count"]/text()', response

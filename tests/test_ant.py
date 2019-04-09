@@ -18,6 +18,12 @@ async def test_ant():
             super().__init__()
             self.count = 0
 
+        async def on_spider_open(self):
+            pass
+
+        async def on_spider_close(self):
+            raise Exception("This exception will be logged")
+
         def process(self, thing):
             self.count += 1
             return thing
@@ -201,37 +207,27 @@ async def test_with_real_request():
     assert res.status == 200
     assert res.simple_json["args"]["k1"] == "v1"
     assert res.simple_json["args"]["k2"] == "v2"
-    res = await ant.request(
-        httpbin_base_url + "get", params={"k1": "v1", "k2": "v2"}
-    )
+    res = await ant.request(httpbin_base_url + "get", params={"k1": "v1", "k2": "v2"})
     assert res.status == 200
     assert res.simple_json["args"]["k1"] == "v1"
     assert res.simple_json["args"]["k2"] == "v2"
     # data with str
-    res = await ant.request(
-        httpbin_base_url + "post", data="Test data", method="POST"
-    )
+    res = await ant.request(httpbin_base_url + "post", data="Test data", method="POST")
     assert res.status == 200
     assert res.simple_json["data"] == "Test data"
     # data with dict
-    res = await ant.request(
-        httpbin_base_url + "post", method="POST", data={"k1": "v1"}
-    )
+    res = await ant.request(httpbin_base_url + "post", method="POST", data={"k1": "v1"})
     assert res.status == 200
     assert res.simple_json["form"]["k1"] == "v1"
     # data with bytes
-    res = await ant.request(
-        httpbin_base_url + "post", method="POST", data=b"12345"
-    )
+    res = await ant.request(httpbin_base_url + "post", method="POST", data=b"12345")
     assert res.status == 200
     assert res.simple_json["data"] == "12345"
     # data with file
     with open("tests/test.html", "r") as f:
         file_content = f.read()
         f.seek(0)
-        res = await ant.request(
-            httpbin_base_url + "post", method="POST", data=f
-        )
+        res = await ant.request(httpbin_base_url + "post", method="POST", data=f)
         assert res.status == 200
         assert res.simple_json["data"] == file_content
     # headers
@@ -259,9 +255,7 @@ async def test_with_real_request():
     res = await ant.request(httpbin_base_url + "redirect/2")
     assert res.status == 200
     # with http proxy
-    proxy = os.getenv(
-        "TEST_HTTP_PROXY", "http://bugman:letmein@localhost:3128"
-    )
+    proxy = os.getenv("TEST_HTTP_PROXY", "http://bugman:letmein@localhost:3128")
     ant.request_proxies.append(proxy)
     res = await ant.request("http://httpbin.org/anything")
     assert res.status == 200
@@ -283,9 +277,7 @@ async def test_with_real_request():
         if len(chunk) == 0:
             break
     # set streaming by request
-    res = await ant.request(
-        httpbin_base_url + "anything", response_in_stream=False
-    )
+    res = await ant.request(httpbin_base_url + "anything", response_in_stream=False)
     assert res.status == 200
     assert res.simple_text is not None
 
@@ -376,9 +368,7 @@ async def test_as_completed():
     assert right_result == count
     # with limit
     right_result = 2  # 2, 1, 0
-    for c in ant.as_completed(
-        (cor(i) for i in reversed(range(count))), limit=1
-    ):
+    for c in ant.as_completed((cor(i) for i in reversed(range(count))), limit=1):
         result = await c
         assert result == right_result
         right_result -= 1
@@ -398,9 +388,7 @@ async def test_as_completed_with_async():
         return x
 
     result_sum = 0
-    async for result in ant.as_completed_with_async(
-        (cor(i) for i in range(5))
-    ):
+    async for result in ant.as_completed_with_async((cor(i) for i in range(5))):
         result_sum += result
     assert result_sum == sum(range(5))
 
@@ -411,9 +399,7 @@ async def test_as_completed_with_async():
         result_sum += result
     assert result_sum == sum(range(3))
 
-    async for _ in ant.as_completed_with_async(
-        [cor(-1)], raise_exception=False
-    ):
+    async for _ in ant.as_completed_with_async([cor(-1)], raise_exception=False):
         raise Exception("This loop should not be entered!")
 
     with pytest.raises(Exception):
@@ -421,26 +407,6 @@ async def test_as_completed_with_async():
             pass
 
     await ant.close()
-
-
-@pytest.mark.asyncio
-async def test_timeout():
-    async def cor():
-        await asyncio.sleep(2)
-
-    assert timeout_wrapper(cor, -1) is cor
-
-    with pytest.raises(asyncio.TimeoutError):
-        await timeout_wrapper(cor(), timeout=0.1)
-
-    with pytest.raises(asyncio.TimeoutError):
-        await timeout_wrapper(cor, timeout=0.1)()
-
-    async def bar():
-        await timeout_wrapper(cor(), timeout=0.1)
-
-    with pytest.raises(asyncio.TimeoutError):
-        await timeout_wrapper(bar(), timeout=0.2)
 
 
 @pytest.mark.asyncio

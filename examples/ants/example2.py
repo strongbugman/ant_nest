@@ -7,8 +7,7 @@ class GithubAnt(Ant):
 
     item_pipelines = [
         ItemFieldReplacePipeline(
-            ("meta_content", "star", "fork"),
-            excess_chars=("\r", "\n", "\t", "  "),
+            ("meta_content", "star", "fork"), excess_chars=("\r", "\n", "\t", "  ")
         )
     ]
     concurrent_limit = 1  # save the website`s and your bandwidth!
@@ -16,9 +15,7 @@ class GithubAnt(Ant):
     def __init__(self):
         super().__init__()
         self.item_extractor = ItemExtractor(dict)
-        self.item_extractor.add_pattern(
-            "xpath", "title", "//h1/strong/a/text()"
-        )
+        self.item_extractor.add_pattern("xpath", "title", "//h1/strong/a/text()")
         self.item_extractor.add_pattern(
             "xpath", "author", "//h1/span/a/text()", default="Not found"
         )
@@ -30,9 +27,7 @@ class GithubAnt(Ant):
             default="Not found!",
         )
         self.item_extractor.add_pattern(
-            "xpath",
-            "star",
-            '//a[@class="social-count js-social-count"]/text()',
+            "xpath", "star", '//a[@class="social-count js-social-count"]/text()'
         )
         self.item_extractor.add_pattern(
             "xpath", "fork", '//a[@class="social-count"]/text()'

@@ -15,7 +15,7 @@ from .test_things import fake_response
 @pytest.mark.asyncio
 async def test_pipeline():
     pl = Pipeline()
-    await pl.process(Request("GET", URL("https://test.com")))
+    pl.process(Request("GET", URL("https://test.com")))
 
 
 def test_response_filter_error_pipeline():
