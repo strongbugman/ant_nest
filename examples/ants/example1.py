@@ -26,7 +26,7 @@ class GithubAnt(Ant):
         )
         item["meta_content"] = ItemExtractor.extract_value(
             "xpath",
-            '//div[@class="repository-meta-content col-11 mb-1"]//text()',
+            '//div[@class="repository-content "]/div[2]//text()',
             response,
             extract_type=ItemExtractor.EXTRACT_WITH_JOIN_ALL,
             default="Not found!",
@@ -48,7 +48,7 @@ class GithubAnt(Ant):
         """App entrance, our play ground"""
         response = await self.request("https://github.com/explore")
         for url in response.html_element.xpath(
-            "/html/body/div[4]/div[2]/div/div[2]/div[1]/article//h1/a[2]/"
+            "/html/body/div[4]/main/div[2]/div/div[2]/div[1]/article/div/div[1]/h1/a[2]/"
             "@href"
         ):
             # crawl many repos with our coroutines pool
