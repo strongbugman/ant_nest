@@ -3,7 +3,7 @@ import os
 import logging
 import asyncio
 
-from ant_nest import ExceptionFilter
+from ant_nest.exceptions import ExceptionFilter
 
 # your ant`s class modules or packages
 ANT_PACKAGES = ["ants"]

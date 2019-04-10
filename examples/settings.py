@@ -3,7 +3,7 @@ import os
 import logging
 import asyncio
 
-from ant_nest import ExceptionFilter
+from ant_nest.exceptions import ExceptionFilter
 
 ANT_PACKAGES = ["ants"]
 ANT_ENV = os.getenv("ANT_ENV", "production")

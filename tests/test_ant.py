@@ -6,8 +6,10 @@ from tenacity import RetryError
 import aiohttp
 from yarl import URL
 
-from ant_nest import *
-from ant_nest.ant import CliAnt
+from ant_nest.pipelines import Pipeline
+from ant_nest.ant import CliAnt, Ant
+from ant_nest.things import Request
+from ant_nest.exceptions import ThingDropped
 from .test_things import fake_response
 
 
@@ -400,11 +402,12 @@ async def test_as_completed_with_async():
     assert result_sum == sum(range(3))
 
     async for _ in ant.as_completed_with_async([cor(-1)], raise_exception=False):
+        assert _
         raise Exception("This loop should not be entered!")
 
     with pytest.raises(Exception):
         async for _ in ant.as_completed_with_async([cor(-1)]):
-            pass
+            assert _
 
     await ant.close()
 

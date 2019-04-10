@@ -17,7 +17,7 @@ from tenacity.retry import retry_if_result, retry_if_exception_type
 from tenacity.wait import wait_fixed
 from tenacity.stop import stop_after_attempt
 
-from .pipelines import Pipeline, ItemPrintPipeline
+from .pipelines import Pipeline
 from .things import Request, Response, Item
 from .exceptions import ThingDropped
 

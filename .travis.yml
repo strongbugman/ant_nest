@@ -11,7 +11,7 @@ before_install:
 - sudo /etc/init.d/mysql stop
 - make prepare_test_env
 install:
-- pip install codecov black mypy
+- pip install codecov black mypy flak8
 script: make test
 after_success:
 - make destroy_test_env

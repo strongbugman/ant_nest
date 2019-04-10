@@ -10,7 +10,8 @@ destroy_test_env:
 	docker stop test_httpbin test_squid
 
 test:
-	black . --check
+	black ant_nest tests examples setup.py --check
+	flake8 ant_nest tests examples setup.py
 	mypy --ignore-missing-imports ant_nest
 	python setup.py test --addopts='--cov ant_nest --cov-report term-missing'
 	python setup.py install && cd examples && ant_nest -a "*" && cd ../

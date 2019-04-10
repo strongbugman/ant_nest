@@ -1,5 +1,7 @@
-from ant_nest import *
 from yarl import URL
+from ant_nest.ant import Ant
+from ant_nest.pipelines import ItemFieldReplacePipeline
+from ant_nest.things import ItemExtractor
 
 
 class GithubAnt(Ant):
