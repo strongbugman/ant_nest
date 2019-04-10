@@ -45,56 +45,72 @@ Then we have a project::
 
 Presume we want to get hot repos from github, let`s create "examples/ants/example2.py"::
 
-    from ant_nest import *
     from yarl import URL
+    from ant_nest.ant import Ant
+    from ant_nest.pipelines import ItemFieldReplacePipeline
+    from ant_nest.things import ItemExtractor
 
 
     class GithubAnt(Ant):
         """Crawl trending repositories from github"""
+
         item_pipelines = [
             ItemFieldReplacePipeline(
-                ('meta_content', 'star', 'fork'),
-                excess_chars=('\r', '\n', '\t', '  '))
+                ("meta_content", "star", "fork"), excess_chars=("\r", "\n", "\t", "  ")
+            )
         ]
         concurrent_limit = 1  # save the website`s and your bandwidth!
 
         def __init__(self):
             super().__init__()
             self.item_extractor = ItemExtractor(dict)
-            self.item_extractor.add_pattern(
-                'xpath', 'title', '//h1/strong/a/text()')
-            self.item_extractor.add_pattern(
-                'xpath', 'author', '//h1/span/a/text()', default='Not found')
-            self.item_extractor.add_pattern(
-                'xpath', 'meta_content',
-                '//div[@class="repository-meta-content col-11 mb-1"]//text()',
-                extract_type=ItemExtractor.EXTRACT_WITH_JOIN_ALL)
-            self.item_extractor.add_pattern(
-                'xpath',
-                'star', '//a[@class="social-count js-social-count"]/text()')
-            self.item_extractor.add_pattern(
-                'xpath', 'fork', '//a[@class="social-count"]/text()')
+            self.item_extractor.add_extractor(
+                "title", lambda x: x.html_element.xpath("//h1/strong/a/text()")[0]
+            )
+            self.item_extractor.add_extractor(
+                "author", lambda x: x.html_element.xpath("//h1/span/a/text()")[0]
+            )
+            self.item_extractor.add_extractor(
+                "meta_content",
+                lambda x: "".join(
+                    x.html_element.xpath(
+                        '//div[@class="repository-content "]/div[2]//text()'
+                    )
+                ),
+            )
+            self.item_extractor.add_extractor(
+                "star",
+                lambda x: x.html_element.xpath(
+                    '//a[@class="social-count js-social-count"]/text()'
+                )[0],
+            )
+            self.item_extractor.add_extractor(
+                "fork",
+                lambda x: x.html_element.xpath('//a[@class="social-count"]/text()')[0],
+            )
+            self.item_extractor.add_extractor("origin_url", lambda x: str(x.url))
 
         async def crawl_repo(self, url):
             """Crawl information from one repo"""
             response = await self.request(url)
             # extract item from response
             item = self.item_extractor.extract(response)
-            item['origin_url'] = response.url
+            item["origin_url"] = response.url
 
             await self.collect(item)  # let item go through pipelines(be cleaned)
-            self.logger.info('*' * 70 + 'I got one hot repo!\n' + str(item))
+            self.logger.info("*" * 70 + "I got one hot repo!\n" + str(item))
 
         async def run(self):
             """App entrance, our play ground"""
-            response = await self.request('https://github.com/explore')
+            response = await self.request("https://github.com/explore")
             for url in response.html_element.xpath(
-                    '/html/body/div[4]/div[2]/div/div[2]/div[1]/article//h1/a[2]/'
-                    '@href'):
+                "/html/body/div[4]/main/div[2]/div/div[2]/div[1]/article/div/div[1]/h1/a[2]/"
+                "@href"
+            ):
                 # crawl many repos with our coroutines pool
-                self.schedule_coroutine(
-                    self.crawl_repo(response.url.join(URL(url))))
-            self.logger.info('Waiting...')
+                self.schedule_task(self.crawl_repo(response.url.join(URL(url))))
+            self.logger.info("Waiting...")
+
 
 Then we can list all ants we defined (in "examples") ::
 
@@ -127,35 +143,39 @@ Run it! (without debug log)::
 So, it`s easy to config ant by class attribute ::
 
     class Ant(abc.ABC):
-        response_pipelines: List[Pipeline] = []
-        request_pipelines: List[Pipeline] = []
-        item_pipelines: List[Pipeline] = []
+        response_pipelines: typing.List[Pipeline] = []
+        request_pipelines: typing.List[Pipeline] = []
+        item_pipelines: typing.List[Pipeline] = []
         request_cls = Request
         response_cls = Response
-        request_timeout = DEFAULT_TIMEOUT.total
+        request_timeout = 60
         request_retries = 3
         request_retry_delay = 5
-        request_proxies: List[Union[str, URL]] = []
+        request_proxies: typing.List[typing.Union[str, URL]] = []
         request_max_redirects = 10
         request_allow_redirects = True
         response_in_stream = False
-        connection_limit = 100  # see "TCPConnector" in "aiohttp"
+        connection_limit = 10  # see "TCPConnector" in "aiohttp"
         connection_limit_per_host = 0
         concurrent_limit = 100
 
 And you can rewrite some config for one request ::
 
-    async def request(self, url: Union[str, URL], method: str = 'GET',
-                      params: Optional[dict] = None,
-                      headers: Optional[dict] = None,
-                      cookies: Optional[dict] = None,
-                      data: Optional[Union[AnyStr, Dict, IO]] = None,
-                      proxy: Optional[Union[str, URL]] = None,
-                      timeout: Optional[Union[int, float]] = None,
-                      retries: Optional[int] = None,
-                      response_in_stream: Optional[bool] = None
-                      ) -> Response:
-
+    async def request(
+        self,
+        url: typing.Union[str, URL],
+        method: str = aiohttp.hdrs.METH_GET,
+        params: typing.Optional[dict] = None,
+        headers: typing.Optional[dict] = None,
+        cookies: typing.Optional[dict] = None,
+        data: typing.Optional[
+            typing.Union[typing.AnyStr, typing.Dict, typing.IO]
+        ] = None,
+        proxy: typing.Optional[typing.Union[str, URL]] = None,
+        timeout: typing.Optional[float] = None,
+        retries: typing.Optional[int] = None,
+        response_in_stream: typing.Optional[bool] = None,
+    ) -> Response:
 
 About Item
 ==========
@@ -192,6 +212,13 @@ but we can use "self.as_completed_with_async" now, eg::
 
 It`s a "feature" that asyncio eat large memory especially with high concurrent IO, we can set a
 concurrent limit("connection_limit" or "concurrent_limit") simply, but it`s complex to get the balance between performance and limit.
+
+
+Coding style
+============
+
+Follow "Flake8", Format by "Black", typing check by "MyPy", sea Makefile for more detail.
+
 
 Todo
 ====

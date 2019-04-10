@@ -6,8 +6,10 @@ from tenacity import RetryError
 import aiohttp
 from yarl import URL
 
-from ant_nest import *
-from ant_nest.ant import CliAnt
+from ant_nest.pipelines import Pipeline
+from ant_nest.ant import CliAnt, Ant
+from ant_nest.things import Request
+from ant_nest.exceptions import ThingDropped
 from .test_things import fake_response
 
 
@@ -18,6 +20,12 @@ async def test_ant():
             super().__init__()
             self.count = 0
 
+        async def on_spider_open(self):
+            pass
+
+        async def on_spider_close(self):
+            raise Exception("This exception will be logged")
+
         def process(self, thing):
             self.count += 1
             return thing
@@ -27,20 +35,20 @@ async def test_ant():
         request_retries = 0
 
         async def run(self):
-            await self.request('http://test.com')
+            await self.request("http://test.com")
             await self.collect(object())
             assert self.item_pipelines[0].count == 1
 
         async def _request(self, req: Request):
-            return fake_response(b'')
+            return fake_response(b"")
 
     ant = TestAnt()
-    assert ant.name == 'TestAnt'
+    assert ant.name == "TestAnt"
     await ant.main()
 
     class Test2Ant(TestAnt):
         async def run(self):
-            raise Exception('Test exception')
+            raise Exception("Test exception")
 
     await Test2Ant().main()
 
@@ -64,22 +72,22 @@ async def test_ant_with_retry():
                 self.retries += 1
                 raise aiohttp.ClientConnectionError()
             else:
-                res = fake_response(b'')
+                res = fake_response(b"")
                 res.status = 200
                 return res
 
-    await Test2Ant().request('https://www.test.com')
+    await Test2Ant().request("https://www.test.com")
     ant = Test2Ant()
     ant.request_retries = 1
     with pytest.raises(RetryError):
-        await ant.request('https://www.test.com')
+        await ant.request("https://www.test.com")
     # with params
     ant.retries = 0
     ant.request_retries = 3
-    await ant.request('https://www.test.com')
+    await ant.request("https://www.test.com")
     ant.retries = 0
     with pytest.raises(aiohttp.ClientConnectionError):
-        await ant.request('https://www.test.com', retries=0)
+        await ant.request("https://www.test.com", retries=0)
 
     await ant.main()
     # retry condition
@@ -88,35 +96,34 @@ async def test_ant_with_retry():
         async def _request(self, req: Request):
             if self.retries < self.min_retries:
                 self.retries += 1
-                res = fake_response(b'')
+                res = fake_response(b"")
                 res.status = 500
                 return res
             else:
-                res = fake_response(b'')
+                res = fake_response(b"")
                 res.status = 200
                 return res
 
-    await Test3Ant().request('https://www.test.com')
+    await Test3Ant().request("https://www.test.com")
     ant = Test3Ant()
     ant.request_retries = 1
     with pytest.raises(RetryError):
-        await ant.request('https://www.test.com')
+        await ant.request("https://www.test.com")
 
     await ant.main()
 
 
 @pytest.mark.asyncio
 async def test_pipelines():
-
     class TestPipeline(Pipeline):
         async def process(self, thing):
-            raise TypeError('Test error')
+            raise TypeError("Test error")
 
         def on_spider_open(self):
-            raise TypeError('Test error')
+            raise TypeError("Test error")
 
         def on_spider_close(self):
-            raise TypeError('Test error')
+            raise TypeError("Test error")
 
     class TestAnt(Ant):
         item_pipelines = [TestPipeline()]
@@ -141,10 +148,9 @@ async def test_pipelines():
 
 @pytest.mark.asyncio
 async def test_ant_report():
-
     class FakePipeline(Pipeline):
         def process(self, thing: Request):
-            if thing.host == 'error':
+            if thing.host == "error":
                 raise ThingDropped
             return thing
 
@@ -156,122 +162,124 @@ async def test_ant_report():
             pass
 
         async def _request(self, req: Request):
-            return fake_response(b'')
+            return fake_response(b"")
 
     ant = FakeAnt()
     # request report
-    await ant.request('http://test.com')
-    assert ant._reports['Request'][1] == 1
-    assert ant._reports['Request'][0] == 0
+    await ant.request("http://test.com")
+    assert ant._reports["Request"][1] == 1
+    assert ant._reports["Request"][0] == 0
     with pytest.raises(ThingDropped):
-        await ant.request('http://error')
-    assert ant._drop_reports['Request'][1] == 1
+        await ant.request("http://error")
+    assert ant._drop_reports["Request"][1] == 1
 
     ant._last_time -= ant._last_time + 1  # report
-    ant.report(Request('GET', URL('http://test')))
-    assert ant._reports['Request'][0] == 1
-    ant.report(Request('GET', URL('http://test')), dropped=True)
-    assert ant._drop_reports['Request'][0] == 1
+    ant.report(Request("GET", URL("http://test")))
+    assert ant._reports["Request"][0] == 1
+    ant.report(Request("GET", URL("http://test")), dropped=True)
+    assert ant._drop_reports["Request"][0] == 1
 
     await ant.main()
 
 
 @pytest.mark.asyncio
 async def test_with_real_request():
-    httpbin_base_url = os.getenv('TEST_HTTPBIN', 'http://localhost:8080/')
+    httpbin_base_url = os.getenv("TEST_HTTPBIN", "http://localhost:8080/")
 
     ant = CliAnt()
     res = await ant.request(httpbin_base_url)
     assert res.status == 200
     # method
-    for method in ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD']:
-        res = await ant.request(httpbin_base_url + 'anything', method=method)
+    for method in ["GET", "POST", "DELETE", "PUT", "PATCH", "HEAD"]:
+        res = await ant.request(httpbin_base_url + "anything", method=method)
         assert res.status == 200
-        if method != 'HEAD':
-            assert res.simple_json['method'] == method
+        if method != "HEAD":
+            assert res.simple_json["method"] == method
         else:
-            assert res.simple_text == ''
+            assert res.simple_text == ""
         # short way
-        res = await ant.request(httpbin_base_url + 'anything', method=method)
+        res = await ant.request(httpbin_base_url + "anything", method=method)
         assert res.status == 200
-        if method != 'HEAD':
-            assert res.simple_json['method'] == method
+        if method != "HEAD":
+            assert res.simple_json["method"] == method
         else:
-            assert res.simple_text == ''
+            assert res.simple_text == ""
     # params
-    res = await ant.request(httpbin_base_url + 'get?k1=v1&k2=v2')
+    res = await ant.request(httpbin_base_url + "get?k1=v1&k2=v2")
     assert res.status == 200
-    assert res.simple_json['args']['k1'] == 'v1'
-    assert res.simple_json['args']['k2'] == 'v2'
-    res = await ant.request(httpbin_base_url + 'get', params={'k1': 'v1', 'k2': 'v2'})
+    assert res.simple_json["args"]["k1"] == "v1"
+    assert res.simple_json["args"]["k2"] == "v2"
+    res = await ant.request(httpbin_base_url + "get", params={"k1": "v1", "k2": "v2"})
     assert res.status == 200
-    assert res.simple_json['args']['k1'] == 'v1'
-    assert res.simple_json['args']['k2'] == 'v2'
+    assert res.simple_json["args"]["k1"] == "v1"
+    assert res.simple_json["args"]["k2"] == "v2"
     # data with str
-    res = await ant.request(
-        httpbin_base_url + 'post', data='Test data', method='POST')
+    res = await ant.request(httpbin_base_url + "post", data="Test data", method="POST")
     assert res.status == 200
-    assert res.simple_json['data'] == 'Test data'
+    assert res.simple_json["data"] == "Test data"
     # data with dict
-    res = await ant.request(httpbin_base_url + 'post', method='POST', data={'k1': 'v1'})
+    res = await ant.request(httpbin_base_url + "post", method="POST", data={"k1": "v1"})
     assert res.status == 200
-    assert res.simple_json['form']['k1'] == 'v1'
+    assert res.simple_json["form"]["k1"] == "v1"
     # data with bytes
-    res = await ant.request(httpbin_base_url + 'post', method='POST', data=b'12345')
+    res = await ant.request(httpbin_base_url + "post", method="POST", data=b"12345")
     assert res.status == 200
-    assert res.simple_json['data'] == '12345'
+    assert res.simple_json["data"] == "12345"
     # data with file
-    with open('tests/test.html', 'r') as f:
+    with open("tests/test.html", "r") as f:
         file_content = f.read()
         f.seek(0)
-        res = await ant.request(httpbin_base_url + 'post', method='POST', data=f)
+        res = await ant.request(httpbin_base_url + "post", method="POST", data=f)
         assert res.status == 200
-        assert res.simple_json['data'] == file_content
+        assert res.simple_json["data"] == file_content
     # headers
-    res = await ant.request(httpbin_base_url + 'headers', headers={'Custom-Key': 'test'})
+    res = await ant.request(
+        httpbin_base_url + "headers", headers={"Custom-Key": "test"}
+    )
     assert res.status == 200
-    assert res.headers['Content-Type'] == 'application/json'
-    assert res.simple_json['headers']['Custom-Key'] == 'test'
+    assert res.headers["Content-Type"] == "application/json"
+    assert res.simple_json["headers"]["Custom-Key"] == "test"
     # cookies
-    res = await ant.request(httpbin_base_url + 'cookies', cookies={'Custom-Key': 'test'})
+    res = await ant.request(
+        httpbin_base_url + "cookies", cookies={"Custom-Key": "test"}
+    )
     assert res.status == 200
-    assert res.simple_json['cookies']['Custom-Key'] == 'test'
+    assert res.simple_json["cookies"]["Custom-Key"] == "test"
     # get cookies
     ant.request_allow_redirects = False
-    res = await ant.request(httpbin_base_url + 'cookies/set?k1=v1&k2=v2')
+    res = await ant.request(httpbin_base_url + "cookies/set?k1=v1&k2=v2")
     assert res.status == 302
-    assert res.cookies['k1'].value == 'v1'
-    assert res.cookies['k2'].value == 'v2'
+    assert res.cookies["k1"].value == "v1"
+    assert res.cookies["k2"].value == "v2"
     # redirects
     ant.request_allow_redirects = True
     ant.request_max_redirects = 3
-    res = await ant.request(httpbin_base_url + 'redirect/2')
+    res = await ant.request(httpbin_base_url + "redirect/2")
     assert res.status == 200
     # with http proxy
-    proxy = os.getenv('TEST_HTTP_PROXY', 'http://bugman:letmein@localhost:3128')
+    proxy = os.getenv("TEST_HTTP_PROXY", "http://bugman:letmein@localhost:3128")
     ant.request_proxies.append(proxy)
-    res = await ant.request('http://httpbin.org/anything')
+    res = await ant.request("http://httpbin.org/anything")
     assert res.status == 200
     # no proxy anymore
     ant.request_proxies.pop()
-    res = await ant.request('http://httpbin.org/anything')
+    res = await ant.request("http://httpbin.org/anything")
     assert res.status == 200
     # set proxy by request
-    res = await ant.request('http://httpbin.org/anything', proxy=proxy)
+    res = await ant.request("http://httpbin.org/anything", proxy=proxy)
     assert res.status == 200
     # with stream
     ant.response_in_stream = True
-    res = await ant.request(httpbin_base_url + 'anything')
+    res = await ant.request(httpbin_base_url + "anything")
     assert res.status == 200
     with pytest.raises(ValueError):
-        res.simple_text
+        getattr(res, "simple_text")
     while True:
         chunk = await res.content.read(10)
         if len(chunk) == 0:
             break
     # set streaming by request
-    res = await ant.request(httpbin_base_url + 'anything',
-                            response_in_stream=False)
+    res = await ant.request(httpbin_base_url + "anything", response_in_stream=False)
     assert res.status == 200
     assert res.simple_text is not None
 
@@ -279,7 +287,7 @@ async def test_with_real_request():
 
 
 @pytest.mark.asyncio
-async def test_schedule_coroutine():
+async def test_schedule_task():
     count = 0
     max_count = 10
 
@@ -289,8 +297,8 @@ async def test_schedule_coroutine():
 
     ant = CliAnt()
 
-    ant.schedule_coroutines((cor() for i in range(max_count)))
-    await ant.wait_scheduled_coroutines()
+    ant.schedule_tasks((cor() for i in range(max_count)))
+    await ant.wait_scheduled_tasks()
     assert count == max_count
     # test with limit
     count = 0
@@ -307,9 +315,9 @@ async def test_schedule_coroutine():
         running_count -= 1
 
     ant.concurrent_limit = concurrent_limit
-    ant.schedule_coroutines(cor() for i in range(max_count))
+    ant.schedule_tasks(cor() for i in range(max_count))
     assert ant.is_running
-    await ant.wait_scheduled_coroutines()
+    await ant.wait_scheduled_tasks()
     assert count == max_count
     assert max_running_count <= concurrent_limit
     # test with exception
@@ -319,17 +327,17 @@ async def test_schedule_coroutine():
     async def coro():
         nonlocal count
         count += 1
-        raise Exception('Test exception')
+        raise Exception("Test exception")
 
-    ant.schedule_coroutines(coro() for i in range(max_count))
-    await ant.wait_scheduled_coroutines()
+    ant.schedule_tasks(coro() for i in range(max_count))
+    await ant.wait_scheduled_tasks()
     assert count == max_count
 
     # test with closed ant
     await ant.close()
 
     x = coro()
-    ant.schedule_coroutine(x)  # this coroutine will not be running
+    ant.schedule_task(x)  # this coroutine will not be running
     await ant.close()
     assert count == max_count
     with pytest.raises(Exception):
@@ -378,57 +386,36 @@ async def test_as_completed_with_async():
 
     async def cor(x):
         if x < 0:
-            raise Exception('Test exception')
+            raise Exception("Test exception")
         return x
 
     result_sum = 0
-    async for result in ant.as_completed_with_async(
-            (cor(i) for i in range(5))):
+    async for result in ant.as_completed_with_async((cor(i) for i in range(5))):
         result_sum += result
     assert result_sum == sum(range(5))
 
     result_sum = 0
     async for result in ant.as_completed_with_async(
-            (cor(i - 2) for i in range(5)), raise_exception=False):
+        (cor(i - 2) for i in range(5)), raise_exception=False
+    ):
         result_sum += result
     assert result_sum == sum(range(3))
 
-    async for _ in ant.as_completed_with_async(
-            [cor(-1)], raise_exception=False):
-        raise Exception('This loop should not be entered!')
+    async for _ in ant.as_completed_with_async([cor(-1)], raise_exception=False):
+        assert _
+        raise Exception("This loop should not be entered!")
 
     with pytest.raises(Exception):
-        async for _ in ant.as_completed_with_async(
-                [cor(-1)]):
-            pass
+        async for _ in ant.as_completed_with_async([cor(-1)]):
+            assert _
 
     await ant.close()
 
 
 @pytest.mark.asyncio
-async def test_timeout():
-
-    async def cor():
-        await asyncio.sleep(2)
-
-    assert timeout_wrapper(cor, -1) is cor
-
-    with pytest.raises(asyncio.TimeoutError):
-        await timeout_wrapper(cor(), timeout=0.1)
-
-    with pytest.raises(asyncio.TimeoutError):
-        await timeout_wrapper(cor, timeout=0.1)()
-
-    async def bar():
-        await timeout_wrapper(cor(), timeout=0.1)
-
-    with pytest.raises(asyncio.TimeoutError):
-        await timeout_wrapper(bar(), timeout=0.2)
-
-
-@pytest.mark.asyncio
 async def test_ant_main():
     """Pipeline closed before scheduled coroutines done?"""
+
     class TestPipeline(Pipeline):
         awake = True
 
@@ -441,7 +428,7 @@ async def test_ant_main():
         in_error = False
 
         async def run(self):
-            self.schedule_coroutine(self.long_cor())
+            self.schedule_task(self.long_cor())
 
         async def long_cor(self):
             await asyncio.sleep(1)

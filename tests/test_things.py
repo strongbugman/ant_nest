@@ -1,22 +1,39 @@
 import sys
 import asyncio
 from unittest import mock
+import re
 
 from yarl import URL
 import pytest
+import jpath
+from lxml import html
 
-from ant_nest import *
 from ant_nest.ant import CliAnt
-from ant_nest.cli import *
+from ant_nest.cli import get_ants
+from ant_nest.things import (
+    Response,
+    Request,
+    ItemExtractor,
+    set_value_to_item,
+    get_value_from_item,
+    ItemNestExtractor,
+)
+from ant_nest.exceptions import ThingDropped, ItemGetValueError, ExceptionFilter
 from ant_nest import cli
 
 
 def fake_response(content):
-    res = Response('GET', URL('http://test.com'), writer=None,
-                   continue100=None, timer=None,
-                   request_info=None, traces=None,
-                   loop=asyncio.get_event_loop(),
-                   session=None)
+    res = Response(
+        "GET",
+        URL("http://test.com"),
+        writer=None,
+        continue100=None,
+        timer=None,
+        request_info=None,
+        traces=None,
+        loop=asyncio.get_event_loop(),
+        session=None,
+    )
     res._content = content
     res._body = content
 
@@ -24,26 +41,26 @@ def fake_response(content):
 
 
 def test_request():
-    req = Request('GET', URL('http://test.com'))
-    assert req.method == 'GET'
+    req = Request("GET", URL("http://test.com"))
+    assert req.method == "GET"
     req.__repr__()
 
 
 def test_response():
-    res = fake_response(b'1')
-    assert res.get_text(encoding='utf-8') == '1'
-    assert res.simple_text == '1'
+    res = fake_response(b"1")
+    assert res.get_text(encoding="utf-8") == "1"
+    assert res.simple_text == "1"
     assert res.simple_json == 1
 
     res = fake_response(None)
     with pytest.raises(ValueError):
         res.get_text()
-    res = fake_response(b'1')
-    res.get_encoding = lambda: 'utf-8'
-    res._get_encoding = lambda: 'utf-8'
-    assert res.get_text() == '1'
+    res = fake_response(b"1")
+    res.get_encoding = lambda: "utf-8"
+    res._get_encoding = lambda: "utf-8"
+    assert res.get_text() == "1"
 
-    res = fake_response(b'')
+    res = fake_response(b"")
 
     def open_browser_function(url):
         return True
@@ -51,93 +68,70 @@ def test_response():
     assert res.open_in_browser(_open_browser_function=open_browser_function)
 
 
-def test_item_set_read():
+def test_set_get_item():
     class ClsItem:
         pass
 
     for item in (dict(), ClsItem()):
-        set_value_to_item(item, 'name', 'test')
-        assert get_value_from_item(item, 'name') == 'test'
-        assert get_value_from_item(item, 'name2', default='test') == 'test'
+        set_value_to_item(item, "name", "test")
+        assert get_value_from_item(item, "name") == "test"
         with pytest.raises(ItemGetValueError):
-            get_value_from_item(item, 'name2')
+            get_value_from_item(item, "name2")
 
 
-def test_extract():
-    with open('./tests/test.html', 'rb') as f:
+def test_extract_item():
+    with open("./tests/test.html", "rb") as f:
         response = fake_response(f.read())
-        response.get_text(encoding='utf-8')
+        response.get_text(encoding="utf-8")
 
     class Item:
         pass
+
     # extract item with xpath and regex
     item_extractor = ItemExtractor(Item)
-    item_extractor.add_pattern('xpath', 'paragraph', '/html/body/div/p/text()')
-    item_extractor.add_pattern('regex', 'title', '<title>([A-Z a-z]+)</title>',
-                               item_extractor.EXTRACT_WITH_JOIN_ALL)
+    item_extractor.add_extractor(
+        "paragraph", lambda x: x.html_element.xpath("/html/body/div/p/text()")[0]
+    )
+    item_extractor.add_extractor(
+        "title", lambda x: re.findall(r"<title>([A-Z a-z]+)</title>", x.simple_text)[0]
+    )
     item = item_extractor.extract(response)
-    assert item.paragraph == 'test'
-    assert item.title == 'Test html'
-    # raise exception it can`t find one key
-    item_extractor.add_pattern('regex', 'test', 'test(\d+)test')
-    with pytest.raises(ItemExtractError):
-        item_extractor.extract(response)
-    # with exception for multiple result
-    item_extractor.add_pattern('xpath', 'paragraph', '/html/head/title/text()')
-    with pytest.raises(ItemExtractError):
-        item_extractor.extract(response)
+    assert item.paragraph == "test"
+    assert item.title == "Test html"
     # extract with jpath
     response = fake_response(b'{"a": {"b": {"c": 1}}, "d": null}')
-    response.get_text(encoding='utf-8')
+    response.get_text(encoding="utf-8")
     item_extractor = ItemExtractor(Item)
-    item_extractor.add_pattern('jpath', 'author', 'a.b.c')
-    item_extractor.add_pattern('jpath', 'freedom', 'd')
+    item_extractor.add_extractor(
+        "author", lambda x: jpath.get_all("a.b.c", x.simple_json)[0]
+    )
+    item_extractor.add_extractor(
+        "freedom", lambda x: jpath.get_all("d", x.simple_json)[0]
+    )
     item = item_extractor.extract(response)
     assert item.author == 1
-    assert item.freedom is None  # "None" obj can be extracted from json
-    with pytest.raises(ValueError):
-        item_extractor.add_pattern('other', 'key', 'pattern')
-    # extract single value with ValueError
-    with pytest.raises(ValueError):
-        ItemExtractor.extract_value('something else', 'test', 'test')
+    assert item.freedom is None
     # ItemNestExtractor tests
-    with open('./tests/test.html', 'rb') as f:
+    with open("./tests/test.html", "rb") as f:
         response = fake_response(f.read())
-        response.get_text(encoding='utf-8')
+        response.get_text(encoding="utf-8")
     item_nest_extractor = ItemNestExtractor(
-        'xpath', '//div[@id="nest"]/div', Item)
-    item_nest_extractor.add_pattern('xpath', 'xpath', './p/text()')
-    item_nest_extractor.add_pattern('regex', 'regex', 'regex(\d+)</')
+        Item, lambda x: x.html_element.xpath('//div[@id="nest"]/div')
+    )
+    item_nest_extractor.add_extractor("xpath_key", lambda x: x.xpath("./p/text()")[0])
+    item_nest_extractor.add_extractor(
+        "regex_key",
+        lambda x: re.findall(r"regex(\d+)</", html.tostring(x, encoding="unicode"))[0],
+    )
     temp = 1
     for item in item_nest_extractor.extract_items(response):
-        assert item.xpath == str(temp)
-        assert item.regex == str(temp)
+        assert item.xpath_key == str(temp)
+        assert item.regex_key == str(temp)
         temp += 1
-
-    with pytest.raises(NotImplementedError):
-        item_nest_extractor.extract(response)
-    # extract with wrappers
-    with open('./tests/test.html', 'rb') as f:
-        response = fake_response(f.read())
-        response.get_text(encoding='utf-8')
-    assert ItemExtractor.extract_value(
-        'xpath', '/html/body/div/p/text()', response.html_element) == 'test'
-    assert ItemExtractor.extract_value(
-        'xpath', '/html/body/div/p/text()', response) == 'test'
-    assert ItemExtractor.extract_value(
-        'xpath', '//a/text()', '<a>test</a>') == 'test'
-    assert ItemExtractor.extract_value('jpath', 'a', {'a': 1}) == 1
-    assert ItemExtractor.extract_value('jpath', 'a', '{"a": 1}') == 1
-    assert ItemExtractor.extract_value(
-        'regex', '(\d+)', 'I have 2 apples') == '2'
-    assert ItemExtractor.extract_value('jpath', 'a', {'a': None}) is None
-    assert ItemExtractor.extract_value('jpath', 'a', {}, default=1) == 1
-    with pytest.raises(ItemExtractError):
-        ItemExtractor.extract_value('jpath', 'a', {})
 
 
 def test_cli_get_ants():
-    ants = get_ants(['ant_nest', 'tests'])
+    ants = get_ants(["ant_nest", "tests"])
     assert CliAnt is list(ants.values())[0]
 
 
@@ -155,35 +149,37 @@ def test_cli_shutdown():
 def test_cli():
 
     with pytest.raises(SystemExit):
-        cli.main(['-v'])
+        cli.main(["-v"])
 
     with pytest.raises(SystemExit):  # no settings.py
-        cli.main(['-l'])
+        cli.main(["-l"])
 
     from ant_nest import _settings_example as settings
+
     # mock settings.py import
-    sys.modules['settings'] = settings
+    sys.modules["settings"] = settings
 
-    settings.ANT_PACKAGES = ['NoAnts']
+    settings.ANT_PACKAGES = ["NoAnts"]
     with pytest.raises(ModuleNotFoundError):  # can`t import NoAnts
-        cli.main(['-l'])
+        cli.main(["-l"])
 
-    settings.ANT_PACKAGES = ['ant_nest.things']
+    settings.ANT_PACKAGES = ["ant_nest.things"]
     with pytest.raises(SystemExit):  # no ants can be found
-        cli.main(['-l'])
+        cli.main(["-l"])
 
-    settings.ANT_PACKAGES = ['tests']
-    cli.main(['-l'])
+    settings.ANT_PACKAGES = ["tests"]
+    cli.main(["-l"])
 
     with pytest.raises(SystemExit):  # FakeAnt not exist
-        cli.main(['-a' 'FakeAnt'])
-        cli.main(['-l'])
+        cli.main(["-a" "FakeAnt"])
+        cli.main(["-l"])
 
-    with pytest.raises(SystemExit), mock.patch('os.mkdir', lambda x: None), \
-            mock.patch('shutil.copyfile', lambda *args: None):
-        cli.main(['-c' '.'])
+    with pytest.raises(SystemExit), mock.patch("os.mkdir", lambda x: None), mock.patch(
+        "shutil.copyfile", lambda *args: None
+    ):
+        cli.main(["-c" "."])
 
-    cli.main(['-a' 'tests.test_things.CliAnt'])
+    cli.main(["-a" "tests.test_things.CliAnt"])
 
 
 def test_exception_filter():
