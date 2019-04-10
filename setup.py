@@ -11,14 +11,18 @@ with open("ant_nest/__init__.py", "rt", encoding="utf8") as f:
 
 requires = [
     "aiohttp>=3.3.0",
-    "lxml>=3.7.0",
-    "jpath>=1.6",
     "tenacity>=4.8.0",
     "ujson>=1.3.4",
     "aiofiles>=0.3.1",
+    "lxml>=3.7.0",
     "typing_extensions>=3.6",
 ]
-tests_requires = ["pytest>=3.3.1", "pytest-asyncio>=0.8.0", "pytest-cov>=2.5.1"]
+tests_requires = [
+    "pytest>=3.3.1",
+    "pytest-asyncio>=0.8.0",
+    "pytest-cov>=2.5.1",
+    "jpath>=1.6",
+]
 setup_requires = ["pytest-runner>=3.0"]
 
 setup(

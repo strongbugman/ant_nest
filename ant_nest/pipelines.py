@@ -63,7 +63,7 @@ class RequestUserAgentPipeline(Pipeline):
         "(KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36"
     )
 
-    def __init__(self, user_agent=user_agent):
+    def __init__(self, user_agent: str = user_agent):
         super().__init__()
         self.user_agent = user_agent
 

@@ -2,15 +2,11 @@ import logging
 import typing
 
 
-__all__ = ["ThingDropped", "ItemExtractError", "ItemGetValueError", "ExceptionFilter"]
+__all__ = ["ThingDropped", "ItemGetValueError", "ExceptionFilter"]
 
 
 class ThingDropped(Exception):
     """Raise when pipeline dropped one thing"""
-
-
-class ItemExtractError(Exception):
-    """For extract item"""
 
 
 class ItemGetValueError(Exception):

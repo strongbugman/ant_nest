@@ -371,16 +371,15 @@ class Ant(abc.ABC):
                 req.headers[aiohttp.hdrs.PROXY_AUTHORIZATION] = auth.encode()
 
         # cookies in headers, params in url
-        req_kwargs = dict(
+        response: typing.Any = await self.session._request(
+            req.method,
+            req.url,
             headers=req.headers,
             data=req.data,
             timeout=req.timeout,
             proxy=req.proxy,
             max_redirects=self.request_max_redirects,
             allow_redirects=self.request_allow_redirects,
-        )
-        response: typing.Any = await self.session._request(
-            req.method, req.url, **req_kwargs
         )
 
         if not req.response_in_stream:

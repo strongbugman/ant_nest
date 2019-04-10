@@ -1,20 +1,16 @@
 """Provide Ant`s Request, Response, Item and Extractor."""
 import typing
 import os
-from collections import defaultdict
 from collections.abc import MutableMapping
-import logging
-import re
 import tempfile
 import webbrowser
 
 from aiohttp import ClientResponse, ClientRequest, hdrs
 from aiohttp.typedefs import LooseHeaders
 from lxml import html
-import jpath
 import ujson
 
-from .exceptions import ItemExtractError, ItemGetValueError
+from .exceptions import ItemGetValueError
 
 
 class Request(ClientRequest):
@@ -32,9 +28,9 @@ class Request(ClientRequest):
         if headers is None or hdrs.HOST not in headers:
             self.headers.pop(hdrs.HOST)
 
-        self.response_in_stream: bool = response_in_stream
-        self.timeout: float = timeout
-        self.data: typing.Any = data
+        self.response_in_stream = response_in_stream
+        self.timeout = timeout
+        self.data = data
 
 
 class Response(ClientResponse):
@@ -103,187 +99,48 @@ def set_value_to_item(item: Item, key: str, value: typing.Any):
         setattr(item, key, value)
 
 
-def get_value_from_item(item: Item, key: str, default: typing.Any = CustomNoneType()):
+def get_value_from_item(item: Item, key: str):
     try:
         if isinstance(item, MutableMapping):
             return item[key]
         else:
             return getattr(item, key)
     except (KeyError, AttributeError) as e:
-        if isinstance(default, CustomNoneType):
-            raise ItemGetValueError from e
-        else:
-            return default
-
-
-Resource = typing.Any
-
-
-class Searcher:
-    """Search data by pattern."""
-
-    name = "base"
-
-    @staticmethod
-    def search(pattern: str, data: Resource) -> typing.List[typing.Any]:
-        """Search information from source data by pattern"""
-
-
-class RegexSearcher(Searcher):
-    name = "regex"
-
-    @staticmethod
-    def search(pattern: str, data: Resource) -> typing.List[typing.Any]:
-        # convert data to string
-        if isinstance(data, Response):
-            data = data.simple_text
-        elif isinstance(data, html.HtmlElement):
-            data = html.tostring(data, encoding="unicode")
-        else:
-            data = str(data)
-        return re.findall(pattern, data)
-
-
-class JsonSearcher(Searcher):
-    name = "jpath"
-
-    @staticmethod
-    def search(pattern: str, data: Resource) -> typing.List[typing.Any]:
-        # convert data to json object
-        if isinstance(data, Response):
-            data = data.simple_json
-        elif isinstance(data, str):
-            data = ujson.loads(data)
-        return jpath.get_all(pattern, data)
-
-
-class XmlSearcher(Searcher):
-    name = "xpath"
-
-    @staticmethod
-    def search(pattern: str, data: Resource) -> typing.List[typing.Any]:
-        if isinstance(data, Response):
-            data = data.html_element
-        elif isinstance(data, str):
-            data = html.fromstring(data)
-        return data.xpath(pattern)
+        raise ItemGetValueError from e
 
 
 class ItemExtractor:
-    """Search data and create item."""
+    def __init__(self, item_cls: typing.Type[Item]):
+        self.item_cls = item_cls
+        self.extractors: typing.Dict[
+            str, typing.Callable[[typing.Any], typing.Any]
+        ] = dict()
 
-    EXTRACT_WITH_TAKE_FIRST = "take_first"
-    EXTRACT_WITH_JOIN_ALL = "join_all"
-    EXTRACT_WITH_DO_NOTHING = "do_nothing"
-    searchers: typing.Dict[str, Searcher] = {
-        cls.name: cls() for cls in (RegexSearcher, JsonSearcher, XmlSearcher)
-    }
-
-    def __init__(self, item_class: typing.Type[Item]) -> None:
-        self.item_class = item_class
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.rules: typing.DefaultDict[
-            str, typing.List[typing.Tuple[str, str, str, typing.Any]]
-        ] = defaultdict(list)
-        # eg: {'name': [('regex', 'pattern', 'extract_type', 'default'),]}
-
-    def add_pattern(
-        self,
-        _type: str,
-        key: str,
-        pattern: str,
-        extract_type: str = EXTRACT_WITH_TAKE_FIRST,
-        default: typing.Any = CustomNoneType(),
+    def add_extractor(
+        self, key: str, extractor: typing.Callable[[typing.Any], typing.Any]
     ):
-        if _type in self.searchers.keys():
-            self.rules[key].append((_type, pattern, extract_type, default))
-        else:
-            raise ValueError("The type of searcher: {:s} not support".format(_type))
+        self.extractors[key] = extractor
 
-    @classmethod
-    def extract_value(
-        cls,
-        _type: str,
-        pattern: str,
-        data: Resource,
-        extract_type=EXTRACT_WITH_TAKE_FIRST,
-        default: typing.Any = CustomNoneType(),
-    ) -> typing.Any:
-        if _type not in cls.searchers.keys():
-            raise ValueError("The type: {:s} not support".format(_type))
+    def extract(self, res: Response) -> Item:
+        item = self.item_cls()
+        for key, extractor in self.extractors.items():
+            set_value_to_item(item, key, extractor(res))
 
-        extract_value = cls.searchers[_type].search(pattern, data)
-        if not extract_value:
-            if not isinstance(default, CustomNoneType):
-                return default
-            else:
-                raise ItemExtractError(
-                    "Get empty result when extract value"
-                    "with rule: {:s}".format(str((_type, pattern)))
-                )
-        if extract_type == ItemExtractor.EXTRACT_WITH_TAKE_FIRST:
-            return extract_value[0]
-        elif extract_type == ItemExtractor.EXTRACT_WITH_JOIN_ALL:
-            return "".join(
-                list(filter(lambda x: isinstance(x, str), extract_value))
-            )  # join string only
-        else:
-            return extract_value
-
-    def extract(self, data: Resource) -> Item:
-        """Create item by patterns"""
-        self.logger.debug(
-            "Extract item: {:s} with rule: {:s}".format(
-                self.item_class.__name__, str(self.rules)
-            )
-        )
-        item = self.item_class()
-        for key, rule in self.rules.items():
-            value = CustomNoneType()
-            for path_type, path, extract_type, default in rule:
-                try:
-                    extract_value = self.__class__.extract_value(
-                        path_type,
-                        path,
-                        data,
-                        extract_type=extract_type,
-                        default=default,
-                    )
-                except ItemExtractError:
-                    continue
-                if not isinstance(value, CustomNoneType) and value != extract_value:
-                    raise ItemExtractError(
-                        "Match different result: {:s} and {:s} for key: "
-                        "{:s}".format(value, extract_value, key)
-                    )
-                value = extract_value
-            if not isinstance(value, CustomNoneType):
-                set_value_to_item(item, key, value)
-            else:
-                raise ItemExtractError("Can`t extract item`s key: " + key)
         return item
 
 
 class ItemNestExtractor(ItemExtractor):
     def __init__(
-        self, root_path_type: str, root_path: str, item_class: typing.Type[Item]
-    ) -> None:
-        self.root_path_type = root_path_type
-        self.root_path = root_path
+        self,
+        item_class: typing.Type[Item],
+        root_extractor: typing.Callable[[Response], typing.Sequence],
+    ):
+        self.root_extractor = root_extractor
         super().__init__(item_class)
 
-    def extract(self, data: Resource):
-        raise NotImplementedError("This method is dropped in this class")
-
-    def extract_items(self, data: Resource) -> typing.Generator[Item, None, None]:
-        base_data = self.extract_value(
-            self.root_path_type,
-            self.root_path,
-            data,
-            extract_type=self.EXTRACT_WITH_DO_NOTHING,
-        )
-        for data in base_data:
-            yield super().extract(data)
+    def extract_items(self, res: Response) -> typing.Generator[Item, None, None]:
+        for node in self.root_extractor(res):
+            yield super().extract(node)
 
 
 __all__ = [

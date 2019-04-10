@@ -1,7 +1,6 @@
 from yarl import URL
 from ant_nest.ant import Ant
 from ant_nest.pipelines import ItemFieldReplacePipeline
-from ant_nest.things import ItemExtractor
 
 
 class GithubAnt(Ant):
@@ -19,25 +18,19 @@ class GithubAnt(Ant):
         response = await self.request(url)
         # extract item from response
         item = dict()
-        item["title"] = ItemExtractor.extract_value(
-            "xpath", "//h1/strong/a/text()", response
+        item["title"] = response.html_element.xpath("//h1/strong/a/text()")[0]
+        item["author"] = response.html_element.xpath("//h1/span/a/text()")[0]
+        item["meta_content"] = "".join(
+            response.html_element.xpath(
+                '//div[@class="repository-content "]/div[2]//text()'
+            )
         )
-        item["author"] = ItemExtractor.extract_value(
-            "xpath", "//h1/span/a/text()", response
-        )
-        item["meta_content"] = ItemExtractor.extract_value(
-            "xpath",
-            '//div[@class="repository-content "]/div[2]//text()',
-            response,
-            extract_type=ItemExtractor.EXTRACT_WITH_JOIN_ALL,
-            default="Not found!",
-        )
-        item["star"] = ItemExtractor.extract_value(
-            "xpath", '//a[@class="social-count js-social-count"]/text()', response
-        )
-        item["fork"] = ItemExtractor.extract_value(
-            "xpath", '//a[@class="social-count"]/text()', response
-        )
+        item["star"] = response.html_element.xpath(
+            '//a[@class="social-count js-social-count"]/text()'
+        )[0]
+        item["fork"] = response.html_element.xpath('//a[@class="social-count"]/text()')[
+            0
+        ]
         item["origin_url"] = response.url
 
         await self.collect(item)  # let item go through pipelines(be cleaned)

@@ -17,23 +17,31 @@ class GithubAnt(Ant):
     def __init__(self):
         super().__init__()
         self.item_extractor = ItemExtractor(dict)
-        self.item_extractor.add_pattern("xpath", "title", "//h1/strong/a/text()")
-        self.item_extractor.add_pattern(
-            "xpath", "author", "//h1/span/a/text()", default="Not found"
+        self.item_extractor.add_extractor(
+            "title", lambda x: x.html_element.xpath("//h1/strong/a/text()")[0]
         )
-        self.item_extractor.add_pattern(
-            "xpath",
+        self.item_extractor.add_extractor(
+            "author", lambda x: x.html_element.xpath("//h1/span/a/text()")[0]
+        )
+        self.item_extractor.add_extractor(
             "meta_content",
-            '//div[@class="repository-content "]/div[2]//text()',
-            extract_type=ItemExtractor.EXTRACT_WITH_JOIN_ALL,
-            default="Not found!",
+            lambda x: "".join(
+                x.html_element.xpath(
+                    '//div[@class="repository-content "]/div[2]//text()'
+                )
+            ),
         )
-        self.item_extractor.add_pattern(
-            "xpath", "star", '//a[@class="social-count js-social-count"]/text()'
+        self.item_extractor.add_extractor(
+            "star",
+            lambda x: x.html_element.xpath(
+                '//a[@class="social-count js-social-count"]/text()'
+            )[0],
         )
-        self.item_extractor.add_pattern(
-            "xpath", "fork", '//a[@class="social-count"]/text()'
+        self.item_extractor.add_extractor(
+            "fork",
+            lambda x: x.html_element.xpath('//a[@class="social-count"]/text()')[0],
         )
+        self.item_extractor.add_extractor("origin_url", lambda x: str(x.url))
 
     async def crawl_repo(self, url):
         """Crawl information from one repo"""
