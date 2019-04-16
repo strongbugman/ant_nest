@@ -90,7 +90,8 @@ def test_extract_item():
     # extract item with xpath and regex
     item_extractor = ItemExtractor(Item)
     item_extractor.add_extractor(
-        "paragraph", lambda x: x.html_element.xpath("/html/body/div/p/text()")[0]
+        "paragraph",
+        lambda x: html.fromstring(x.simple_text).xpath("/html/body/div/p/text()")[0],
     )
     item_extractor.add_extractor(
         "title", lambda x: re.findall(r"<title>([A-Z a-z]+)</title>", x.simple_text)[0]
@@ -116,7 +117,7 @@ def test_extract_item():
         response = fake_response(f.read())
         response.get_text(encoding="utf-8")
     item_nest_extractor = ItemNestExtractor(
-        Item, lambda x: x.html_element.xpath('//div[@id="nest"]/div')
+        Item, lambda x: html.fromstring(x.simple_text).xpath('//div[@id="nest"]/div')
     )
     item_nest_extractor.add_extractor("xpath_key", lambda x: x.xpath("./p/text()")[0])
     item_nest_extractor.add_extractor(
