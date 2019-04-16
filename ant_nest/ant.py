@@ -20,6 +20,7 @@ from tenacity.stop import stop_after_attempt
 from .pipelines import Pipeline
 from .things import Request, Response, Item
 from .exceptions import ThingDropped
+from .utils import run_cor_func
 
 __all__ = ["Ant", "CliAnt"]
 
@@ -141,9 +142,7 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(
             self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
-            obj = pipeline.on_spider_open()
-            if obj and asyncio.iscoroutine(obj):
-                await obj
+            await run_cor_func(pipeline.on_spider_open)
 
     async def close(self) -> None:
         await self.wait_scheduled_tasks()
@@ -151,9 +150,7 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(
             self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
-            obj = pipeline.on_spider_close()
-            if obj and asyncio.iscoroutine(obj):
-                await obj
+            await run_cor_func(pipeline.on_spider_close)
 
         await self.session.close()
 
@@ -353,9 +350,7 @@ class Ant(abc.ABC):
         raw_thing = thing
         for pipeline in pipelines:
             try:
-                thing = pipeline.process(thing)
-                if asyncio.iscoroutine(thing):
-                    thing = await thing
+                thing = await run_cor_func(pipeline.process, thing)
             except Exception as e:
                 if isinstance(e, ThingDropped):
                     self.report(raw_thing, dropped=True)
