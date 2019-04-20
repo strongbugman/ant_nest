@@ -15,6 +15,7 @@ requires = [
     "ujson>=1.3.4",
     "aiofiles>=0.3.1",
     "typing_extensions>=3.6",
+    "IPython>=7.0",
 ]
 tests_requires = [
     "pytest>=3.3.1",

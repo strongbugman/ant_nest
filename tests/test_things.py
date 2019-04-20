@@ -1,4 +1,5 @@
 import sys
+import os
 import asyncio
 from unittest import mock
 import re
@@ -148,12 +149,16 @@ def test_cli_shutdown():
 
 
 def test_cli():
+    httpbin_base_url = os.getenv("TEST_HTTPBIN", "http://localhost:8080/")
 
     with pytest.raises(SystemExit):
         cli.main(["-v"])
 
     with pytest.raises(SystemExit):  # no settings.py
         cli.main(["-l"])
+
+    with pytest.raises(SystemExit), mock.patch("IPython.embed"):  # no settings.py
+        cli.main(["-u", httpbin_base_url])
 
     from ant_nest import _settings_example as settings
 

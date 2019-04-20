@@ -70,7 +70,8 @@ class Response(ClientResponse):
         _open_browser_function: typing.Callable[..., bool] = webbrowser.open,
     ) -> bool:
         fd, path = tempfile.mkstemp(file_type)
-        os.write(fd, self._body)
+        if self._body:
+            os.write(fd, self._body)
         os.close(fd)
         return _open_browser_function("file://" + path)
 

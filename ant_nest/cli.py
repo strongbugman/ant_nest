@@ -13,7 +13,9 @@ import functools
 from asyncio.queues import QueueEmpty
 import fnmatch
 
-from .ant import Ant
+import IPython
+
+from .ant import Ant, CliAnt
 from . import __version__
 
 __signal_count = 0
@@ -77,11 +79,22 @@ def main(args=None):
         "-v", "--version", help="get package version", action="store_true"
     )
     parser.add_argument("-c", "--project", help="project name")
+    parser.add_argument("-u", "--url", help="url")
     args = parser.parse_args(args)
     sys.path.append(os.getcwd())
 
     if args.version:
         print(__version__)
+        exit()
+    elif args.url:
+        cli_ant = CliAnt()
+        res = asyncio.get_event_loop().run_until_complete(cli_ant.request(args.url))
+        objs = {"res": res, "cli_ant": cli_ant}
+        IPython.embed(
+            header=f"AntNest-{__version__}\nAvaliable objects:\n"
+            + "\n".join([f"{name}\t{objs[name]}" for name in objs]),
+            using="asyncio",
+        )
         exit()
     elif args.project:
         from . import _settings_example
