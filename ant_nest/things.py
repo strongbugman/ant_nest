@@ -64,16 +64,12 @@ class Response(ClientResponse):
     def simple_json(self) -> typing.Any:
         return self.get_json()
 
-    def open_in_browser(
-        self,
-        file_type: str = ".html",
-        _open_browser_function: typing.Callable[..., bool] = webbrowser.open,
-    ) -> bool:
+    def open_in_browser(self, file_type: str = ".html") -> bool:
         fd, path = tempfile.mkstemp(file_type)
         if self._body:
             os.write(fd, self._body)
         os.close(fd)
-        return _open_browser_function("file://" + path)
+        return webbrowser.open("file://" + path)
 
 
 class CustomNoneType:

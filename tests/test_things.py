@@ -52,7 +52,7 @@ def test_response():
     assert res.get_text(encoding="utf-8") == "1"
     assert res.simple_text == "1"
     assert res.simple_json == 1
-
+    # get text
     res = fake_response(None)
     with pytest.raises(ValueError):
         res.get_text()
@@ -60,13 +60,10 @@ def test_response():
     res.get_encoding = lambda: "utf-8"
     res._get_encoding = lambda: "utf-8"
     assert res.get_text() == "1"
-
-    res = fake_response(b"")
-
-    def open_browser_function(url):
-        return True
-
-    assert res.open_in_browser(_open_browser_function=open_browser_function)
+    # open in browser
+    res = fake_response(b"1")
+    with mock.patch("webbrowser.open", lambda *x, **y: True):
+        assert res.open_in_browser()
 
 
 def test_set_get_item():
