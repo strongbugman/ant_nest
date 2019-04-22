@@ -45,14 +45,7 @@ class Ant(abc.ABC):
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None):
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.session: aiohttp.ClientSession = ClientSession(
-            response_class=self.response_cls,
-            connector=aiohttp.TCPConnector(
-                limit=self.connection_limit,
-                enable_cleanup_closed=True,
-                limit_per_host=self.connection_limit_per_host,
-            ),
-        )
+        self.session: typing.Optional[aiohttp.ClientSession] = None
         # coroutine`s concurrency support
         self._queue: Queue = Queue(loop=self.loop)
         self._done_queue: Queue = Queue(loop=self.loop)
@@ -152,7 +145,8 @@ class Ant(abc.ABC):
         ):
             await run_cor_func(pipeline.on_spider_close)
 
-        await self.session.close()
+        if self.session:
+            await self.session.close()
 
         self._is_closed = True
         self.logger.info("Closed")
@@ -358,6 +352,16 @@ class Ant(abc.ABC):
         return thing
 
     async def _request(self, req: Request) -> Response:
+        if self.session is None:
+            self.session = ClientSession(
+                response_class=self.response_cls,
+                connector=aiohttp.TCPConnector(
+                    limit=self.connection_limit,
+                    enable_cleanup_closed=True,
+                    limit_per_host=self.connection_limit_per_host,
+                ),
+            )
+
         if req.proxy is not None:
             # proxy auth not work in one session with many requests,
             # add auth header to fix it
