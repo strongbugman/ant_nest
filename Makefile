@@ -14,7 +14,7 @@ test:
 	flake8 ant_nest tests examples setup.py
 	mypy --ignore-missing-imports ant_nest
 	python setup.py test --addopts='--cov ant_nest --cov-report term-missing'
-	python setup.py install && cd examples && ant_nest -a "*" && cd ../
+	python setup.py install && cd examples && pip install -r requirements.txt && ant_nest -a "*" && cd ../
 
 tag:
 	git tag $(version) -m "Release of version $(version)"

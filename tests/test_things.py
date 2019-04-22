@@ -1,4 +1,5 @@
 import sys
+import os
 import asyncio
 from unittest import mock
 import re
@@ -51,7 +52,7 @@ def test_response():
     assert res.get_text(encoding="utf-8") == "1"
     assert res.simple_text == "1"
     assert res.simple_json == 1
-
+    # get text
     res = fake_response(None)
     with pytest.raises(ValueError):
         res.get_text()
@@ -59,13 +60,10 @@ def test_response():
     res.get_encoding = lambda: "utf-8"
     res._get_encoding = lambda: "utf-8"
     assert res.get_text() == "1"
-
-    res = fake_response(b"")
-
-    def open_browser_function(url):
-        return True
-
-    assert res.open_in_browser(_open_browser_function=open_browser_function)
+    # open in browser
+    res = fake_response(b"1")
+    with mock.patch("webbrowser.open", lambda *x, **y: True):
+        assert res.open_in_browser()
 
 
 def test_set_get_item():
@@ -90,7 +88,8 @@ def test_extract_item():
     # extract item with xpath and regex
     item_extractor = ItemExtractor(Item)
     item_extractor.add_extractor(
-        "paragraph", lambda x: x.html_element.xpath("/html/body/div/p/text()")[0]
+        "paragraph",
+        lambda x: html.fromstring(x.simple_text).xpath("/html/body/div/p/text()")[0],
     )
     item_extractor.add_extractor(
         "title", lambda x: re.findall(r"<title>([A-Z a-z]+)</title>", x.simple_text)[0]
@@ -116,7 +115,7 @@ def test_extract_item():
         response = fake_response(f.read())
         response.get_text(encoding="utf-8")
     item_nest_extractor = ItemNestExtractor(
-        Item, lambda x: x.html_element.xpath('//div[@id="nest"]/div')
+        Item, lambda x: html.fromstring(x.simple_text).xpath('//div[@id="nest"]/div')
     )
     item_nest_extractor.add_extractor("xpath_key", lambda x: x.xpath("./p/text()")[0])
     item_nest_extractor.add_extractor(
@@ -147,12 +146,16 @@ def test_cli_shutdown():
 
 
 def test_cli():
+    httpbin_base_url = os.getenv("TEST_HTTPBIN", "http://localhost:8080/")
 
     with pytest.raises(SystemExit):
         cli.main(["-v"])
 
     with pytest.raises(SystemExit):  # no settings.py
         cli.main(["-l"])
+
+    with pytest.raises(SystemExit), mock.patch("IPython.embed"):  # no settings.py
+        cli.main(["-u", httpbin_base_url])
 
     from ant_nest import _settings_example as settings
 

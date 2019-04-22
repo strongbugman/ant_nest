@@ -1,4 +1,6 @@
 from yarl import URL
+from bs4 import BeautifulSoup
+from lxml import html
 from ant_nest.ant import Ant
 from ant_nest.pipelines import ItemFieldReplacePipeline
 from ant_nest.things import ItemExtractor
@@ -18,28 +20,32 @@ class GithubAnt(Ant):
         super().__init__()
         self.item_extractor = ItemExtractor(dict)
         self.item_extractor.add_extractor(
-            "title", lambda x: x.html_element.xpath("//h1/strong/a/text()")[0]
+            "title",
+            lambda x: html.fromstring(x.simple_text).xpath("//h1/strong/a/text()")[0],
         )
         self.item_extractor.add_extractor(
-            "author", lambda x: x.html_element.xpath("//h1/span/a/text()")[0]
+            "author",
+            lambda x: html.fromstring(x.simple_text).xpath("//h1/span/a/text()")[0],
         )
         self.item_extractor.add_extractor(
             "meta_content",
             lambda x: "".join(
-                x.html_element.xpath(
+                html.fromstring(x.simple_text).xpath(
                     '//div[@class="repository-content "]/div[2]//text()'
                 )
             ),
         )
         self.item_extractor.add_extractor(
             "star",
-            lambda x: x.html_element.xpath(
+            lambda x: html.fromstring(x.simple_text).xpath(
                 '//a[@class="social-count js-social-count"]/text()'
             )[0],
         )
         self.item_extractor.add_extractor(
             "fork",
-            lambda x: x.html_element.xpath('//a[@class="social-count"]/text()')[0],
+            lambda x: html.fromstring(x.simple_text).xpath(
+                '//a[@class="social-count"]/text()'
+            )[0],
         )
         self.item_extractor.add_extractor("origin_url", lambda x: str(x.url))
 
@@ -56,10 +62,9 @@ class GithubAnt(Ant):
     async def run(self):
         """App entrance, our play ground"""
         response = await self.request("https://github.com/explore")
-        for url in response.html_element.xpath(
-            "/html/body/div[4]/main/div[2]/div/div[2]/div[1]/article/div/div[1]/h1/a[2]/"
-            "@href"
+        soup = BeautifulSoup(response.simple_text, "html.parser")
+        for node in soup.main.find_all(
+            "a", **{"data-ga-click": "Repository, go to repository"}
         ):
-            # crawl many repos with our coroutines pool
-            self.schedule_task(self.crawl_repo(response.url.join(URL(url))))
+            self.schedule_task(self.crawl_repo(response.url.join(URL(node["href"]))))
         self.logger.info("Waiting...")

@@ -20,6 +20,7 @@ from tenacity.stop import stop_after_attempt
 from .pipelines import Pipeline
 from .things import Request, Response, Item
 from .exceptions import ThingDropped
+from .utils import run_cor_func
 
 __all__ = ["Ant", "CliAnt"]
 
@@ -44,14 +45,7 @@ class Ant(abc.ABC):
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None):
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.session: aiohttp.ClientSession = ClientSession(
-            response_class=self.response_cls,
-            connector=aiohttp.TCPConnector(
-                limit=self.connection_limit,
-                enable_cleanup_closed=True,
-                limit_per_host=self.connection_limit_per_host,
-            ),
-        )
+        self.session: typing.Optional[aiohttp.ClientSession] = None
         # coroutine`s concurrency support
         self._queue: Queue = Queue(loop=self.loop)
         self._done_queue: Queue = Queue(loop=self.loop)
@@ -141,9 +135,7 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(
             self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
-            obj = pipeline.on_spider_open()
-            if obj and asyncio.iscoroutine(obj):
-                await obj
+            await run_cor_func(pipeline.on_spider_open)
 
     async def close(self) -> None:
         await self.wait_scheduled_tasks()
@@ -151,11 +143,10 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(
             self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
-            obj = pipeline.on_spider_close()
-            if obj and asyncio.iscoroutine(obj):
-                await obj
+            await run_cor_func(pipeline.on_spider_close)
 
-        await self.session.close()
+        if self.session:
+            await self.session.close()
 
         self._is_closed = True
         self.logger.info("Closed")
@@ -353,9 +344,7 @@ class Ant(abc.ABC):
         raw_thing = thing
         for pipeline in pipelines:
             try:
-                thing = pipeline.process(thing)
-                if asyncio.iscoroutine(thing):
-                    thing = await thing
+                thing = await run_cor_func(pipeline.process, thing)
             except Exception as e:
                 if isinstance(e, ThingDropped):
                     self.report(raw_thing, dropped=True)
@@ -363,6 +352,16 @@ class Ant(abc.ABC):
         return thing
 
     async def _request(self, req: Request) -> Response:
+        if self.session is None:
+            self.session = ClientSession(
+                response_class=self.response_cls,
+                connector=aiohttp.TCPConnector(
+                    limit=self.connection_limit,
+                    enable_cleanup_closed=True,
+                    limit_per_host=self.connection_limit_per_host,
+                ),
+            )
+
         if req.proxy is not None:
             # proxy auth not work in one session with many requests,
             # add auth header to fix it

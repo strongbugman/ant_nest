@@ -7,7 +7,6 @@ import webbrowser
 
 from aiohttp import ClientResponse, ClientRequest, hdrs
 from aiohttp.typedefs import LooseHeaders
-from lxml import html
 import ujson
 
 from .exceptions import ItemGetValueError
@@ -65,21 +64,12 @@ class Response(ClientResponse):
     def simple_json(self) -> typing.Any:
         return self.get_json()
 
-    @property
-    def html_element(self) -> html.HtmlElement:
-        if self._html_element is None:
-            self._html_element = html.fromstring(self.simple_text)
-        return self._html_element
-
-    def open_in_browser(
-        self,
-        file_type: str = ".html",
-        _open_browser_function: typing.Callable[..., bool] = webbrowser.open,
-    ) -> bool:
+    def open_in_browser(self, file_type: str = ".html") -> bool:
         fd, path = tempfile.mkstemp(file_type)
-        os.write(fd, self._body)
+        if self._body:
+            os.write(fd, self._body)
         os.close(fd)
-        return _open_browser_function("file://" + path)
+        return webbrowser.open("file://" + path)
 
 
 class CustomNoneType:

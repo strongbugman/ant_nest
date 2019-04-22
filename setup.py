@@ -14,14 +14,16 @@ requires = [
     "tenacity>=4.8.0",
     "ujson>=1.3.4",
     "aiofiles>=0.3.1",
-    "lxml>=3.7.0",
     "typing_extensions>=3.6",
+    "IPython>=7.0",
 ]
 tests_requires = [
     "pytest>=3.3.1",
     "pytest-asyncio>=0.8.0",
     "pytest-cov>=2.5.1",
     "jpath>=1.6",
+    "beautifulsoup4",
+    "lxml>3.7.0",
 ]
 setup_requires = ["pytest-runner>=3.0"]
 

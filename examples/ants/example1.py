@@ -1,6 +1,8 @@
-from yarl import URL
 from ant_nest.ant import Ant
 from ant_nest.pipelines import ItemFieldReplacePipeline
+from bs4 import BeautifulSoup
+from lxml import html
+from yarl import URL
 
 
 class GithubAnt(Ant):
@@ -18,19 +20,16 @@ class GithubAnt(Ant):
         response = await self.request(url)
         # extract item from response
         item = dict()
-        item["title"] = response.html_element.xpath("//h1/strong/a/text()")[0]
-        item["author"] = response.html_element.xpath("//h1/span/a/text()")[0]
+        element = html.fromstring(response.simple_text)
+        item["title"] = element.xpath("//h1/strong/a/text()")[0]
+        item["author"] = element.xpath("//h1/span/a/text()")[0]
         item["meta_content"] = "".join(
-            response.html_element.xpath(
-                '//div[@class="repository-content "]/div[2]//text()'
-            )
+            element.xpath('//div[@class="repository-content "]/div[2]//text()')
         )
-        item["star"] = response.html_element.xpath(
+        item["star"] = element.xpath(
             '//a[@class="social-count js-social-count"]/text()'
         )[0]
-        item["fork"] = response.html_element.xpath('//a[@class="social-count"]/text()')[
-            0
-        ]
+        item["fork"] = element.xpath('//a[@class="social-count"]/text()')[0]
         item["origin_url"] = response.url
 
         await self.collect(item)  # let item go through pipelines(be cleaned)
@@ -39,10 +38,9 @@ class GithubAnt(Ant):
     async def run(self):
         """App entrance, our play ground"""
         response = await self.request("https://github.com/explore")
-        for url in response.html_element.xpath(
-            "/html/body/div[4]/main/div[2]/div/div[2]/div[1]/article/div/div[1]/h1/a[2]/"
-            "@href"
+        soup = BeautifulSoup(response.simple_text, "html.parser")
+        for node in soup.main.find_all(
+            "a", **{"data-ga-click": "Repository, go to repository"}
         ):
-            # crawl many repos with our coroutines pool
-            self.schedule_task(self.crawl_repo(response.url.join(URL(url))))
+            self.schedule_task(self.crawl_repo(response.url.join(URL(node["href"]))))
         self.logger.info("Waiting...")

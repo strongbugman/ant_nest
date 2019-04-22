@@ -1,5 +1,4 @@
 import typing
-import asyncio
 import logging
 from collections import defaultdict
 import ujson
@@ -13,6 +12,7 @@ from aiohttp import hdrs
 
 from .things import Response, Request, Item, set_value_to_item, get_value_from_item
 from .exceptions import ThingDropped
+from .utils import run_cor_func
 
 
 class Pipeline:
@@ -226,9 +226,7 @@ class ItemBaseFileDumpPipeline(Pipeline):
         elif isinstance(data, bytes):
             file_mode = "wb"
         elif hasattr(data, "read"):  # readable
-            chunk = data.read(buffer_size)
-            if asyncio.iscoroutine(chunk):
-                chunk = await chunk
+            chunk = await run_cor_func(data.read, buffer_size)
 
             if isinstance(chunk, str):
                 file_mode = "w"
@@ -243,18 +241,14 @@ class ItemBaseFileDumpPipeline(Pipeline):
             if chunk is not None:  # in streaming
                 await file.write(chunk)
                 while True:
-                    chunk = data.read(buffer_size)
-                    if asyncio.iscoroutine(chunk):
-                        chunk = await chunk
+                    chunk = await run_cor_func(data.read, buffer_size)
 
                     if len(chunk) == 0:
                         break
                     else:
                         await file.write(chunk)
 
-                result = data.close()
-                if asyncio.iscoroutine(result):
-                    await result
+                await run_cor_func(data.close)
             else:
                 await file.write(data)
 
