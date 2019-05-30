@@ -78,7 +78,7 @@ def main(args=None):
     parser.add_argument(
         "-v", "--version", help="get package version", action="store_true"
     )
-    parser.add_argument("-c", "--project", help="project name")
+    parser.add_argument("-p", "--project", help="project name")
     parser.add_argument("-u", "--url", help="url")
     args = parser.parse_args(args)
     sys.path.append(os.getcwd())
