@@ -55,7 +55,7 @@ class Response(ClientResponse):
     def simple_text(self) -> str:
         return self.get_text(errors="ignore")
 
-    def get_json(self, loads: typing.Callable = ujson.loads):
+    def get_json(self, loads: typing.Callable = ujson.loads) -> typing.Any:
         if self._json is None:
             self._json = loads(self.simple_text)
         return self._json
@@ -89,7 +89,7 @@ def set_value_to_item(item: Item, key: str, value: typing.Any):
         setattr(item, key, value)
 
 
-def get_value_from_item(item: Item, key: str):
+def get_value_from_item(item: Item, key: str) -> typing.Any:
     try:
         if isinstance(item, MutableMapping):
             return item[key]

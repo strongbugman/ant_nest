@@ -85,18 +85,17 @@ class Ant(abc.ABC):
         retries: typing.Optional[int] = None,
         response_in_stream: typing.Optional[bool] = None,
     ) -> Response:
-        if not isinstance(url, URL):
-            url = URL(url)
+        url = url if isinstance(url, URL) else URL(url)
+        proxy = proxy if proxy else self.get_proxy()
         if proxy and not isinstance(proxy, URL):
             proxy = URL(proxy)
-        elif proxy is None:
-            proxy = self.get_proxy()
-        if timeout is None:
-            timeout = self.request_timeout
-        if retries is None:
-            retries = self.request_retries
-        if response_in_stream is None:
-            response_in_stream = self.response_in_stream
+        timeout = timeout if timeout else self.request_timeout
+        retries = retries if retries is not None else self.request_retries
+        response_in_stream = (
+            response_in_stream
+            if response_in_stream is not None
+            else self.response_in_stream
+        )
 
         req: Request = await self._handle_thing_with_pipelines(
             self.request_cls(
@@ -125,19 +124,19 @@ class Ant(abc.ABC):
         self.report(res)
         return res
 
-    async def collect(self, item: Item) -> None:
+    async def collect(self, item: Item):
         self.logger.debug("Collect item: " + str(item))
         await self._handle_thing_with_pipelines(item, self.item_pipelines)
         self.report(item)
 
-    async def open(self) -> None:
+    async def open(self):
         self.logger.info("Opening")
         for pipeline in itertools.chain(
             self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
             await run_cor_func(pipeline.on_spider_open)
 
-    async def close(self) -> None:
+    async def close(self):
         await self.wait_scheduled_tasks()
 
         for pipeline in itertools.chain(
@@ -152,10 +151,10 @@ class Ant(abc.ABC):
         self.logger.info("Closed")
 
     @abc.abstractmethod
-    async def run(self) -> None:
+    async def run(self):
         """App custom entrance"""
 
-    async def main(self) -> None:
+    async def main(self):
         try:
             await self.open()
             await self.run()
@@ -196,7 +195,7 @@ class Ant(abc.ABC):
         except IndexError:
             return None
 
-    def schedule_task(self, coroutine: typing.Awaitable) -> None:
+    def schedule_task(self, coroutine: typing.Awaitable):
         """Like "asyncio.ensure_future", with concurrent count limit
 
         Call "self.wait_scheduled_tasks" make sure all task has been
@@ -231,7 +230,7 @@ class Ant(abc.ABC):
         else:
             self._queue.put_nowait(coroutine)
 
-    def schedule_tasks(self, coros: typing.Iterable[typing.Awaitable]) -> None:
+    def schedule_tasks(self, coros: typing.Iterable[typing.Awaitable]):
         """A short way to schedule many tasks.
         """
         for coro in coros:
@@ -306,7 +305,7 @@ class Ant(abc.ABC):
                         '"as_completed_with_async"'.format(str(e))
                     )
 
-    def report(self, thing: typing.Any, dropped: bool = False) -> None:
+    def report(self, thing: typing.Any, dropped: bool = False):
         now_time = time.time()
         if now_time - self._last_time > self._report_slot:
             self._last_time = now_time
@@ -337,9 +336,6 @@ class Ant(abc.ABC):
     async def _handle_thing_with_pipelines(
         self, thing: typing.Any, pipelines: typing.List[Pipeline]
     ) -> typing.Any:
-        """Process thing one by one, break the process chain when get
-        exception.
-        """
         self.logger.debug("Process thing: " + str(thing))
         raw_thing = thing
         for pipeline in pipelines:

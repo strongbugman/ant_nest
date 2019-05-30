@@ -216,7 +216,7 @@ class ItemBaseFileDumpPipeline(Pipeline):
     @classmethod
     async def dump(
         cls, file_path: str, data: typing.Any, buffer_size: int = 1024 * 1024
-    ) -> None:
+    ):
         """Dump data(binary or text, stream or normal, async or not) to disk file.
         typing.IO data will be closed.
         """
