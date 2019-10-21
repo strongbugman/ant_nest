@@ -174,9 +174,11 @@ async def test_ant_report():
     assert ant._drop_reports["Request"][1] == 1
 
     ant._last_time -= ant._last_time + 1  # report
-    ant.report(Request("GET", URL("http://test")))
+    ant.report(Request("GET", URL("http://test"), loop=asyncio.get_event_loop()))
     assert ant._reports["Request"][0] == 1
-    ant.report(Request("GET", URL("http://test")), dropped=True)
+    ant.report(
+        Request("GET", URL("http://test"), loop=asyncio.get_event_loop()), dropped=True
+    )
     assert ant._drop_reports["Request"][0] == 1
 
     await ant.main()

@@ -1,5 +1,6 @@
 import os
 import io
+import asyncio
 
 import pytest
 from yarl import URL
@@ -14,7 +15,7 @@ from .test_things import fake_response
 @pytest.mark.asyncio
 async def test_pipeline():
     pl = pls.Pipeline()
-    pl.process(Request("GET", URL("https://test.com")))
+    pl.process(Request("GET", URL("https://test.com"), loop=asyncio.get_event_loop()))
 
 
 def test_response_filter_error_pipeline():
@@ -30,7 +31,7 @@ def test_response_filter_error_pipeline():
 
 def test_request_duplicate_filter_pipeline():
     pl = pls.RequestDuplicateFilterPipeline()
-    req = Request("GET", URL("http://test.com"))
+    req = Request("GET", URL("http://test.com"), loop=asyncio.get_event_loop())
     assert pl.process(req) is req
     with pytest.raises(ThingDropped):
         pl.process(req)
@@ -88,7 +89,7 @@ async def test_item_json_dump_pipeline(item_cls):
 
 def test_request_user_agent_pipeline():
     pl = pls.RequestUserAgentPipeline(user_agent="ant")
-    req = Request("GET", URL("https://www.hi.com"))
+    req = Request("GET", URL("https://www.hi.com"), loop=asyncio.get_event_loop())
     assert pl.process(req) is req
     assert req.headers["User-Agent"] == "ant"
 
@@ -98,7 +99,7 @@ def test_request_user_agent_pipeline():
 
 def test_request_random_user_agent_pipeline():
     pl = pls.RequestRandomUserAgentPipeline()
-    req = Request("GET", URL("https://www.hi.com"))
+    req = Request("GET", URL("https://www.hi.com"), loop=asyncio.get_event_loop())
     assert pl.process(req) is req
     assert req.headers.get("User-Agent") is not None
 

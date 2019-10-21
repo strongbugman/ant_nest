@@ -108,6 +108,7 @@ class Ant(abc.ABC):
                 data=data,
                 proxy=proxy,
                 response_in_stream=response_in_stream,
+                loop=self.loop,
             ),
             self.request_pipelines,
         )
@@ -379,8 +380,7 @@ class Ant(abc.ABC):
 
         if not req.response_in_stream:
             await response.read()
-            response.close()
-            await response.wait_for_close()
+            await response.release()
         return response
 
 

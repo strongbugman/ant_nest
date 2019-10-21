@@ -42,7 +42,7 @@ def fake_response(content):
 
 
 def test_request():
-    req = Request("GET", URL("http://test.com"))
+    req = Request("GET", URL("http://test.com"), loop=asyncio.get_event_loop())
     assert req.method == "GET"
     req.__repr__()
 
