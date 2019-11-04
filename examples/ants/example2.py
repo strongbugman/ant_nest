@@ -63,8 +63,11 @@ class GithubAnt(Ant):
         """App entrance, our play ground"""
         response = await self.request("https://github.com/explore")
         soup = BeautifulSoup(response.simple_text, "html.parser")
+        urls = set()
         for node in soup.main.find_all(
-            "a", **{"data-ga-click": "Repository, go to repository"}
+            "a", **{"data-ga-click": "Explore, go to repository, location:explore feed"}
         ):
-            self.schedule_task(self.crawl_repo(response.url.join(URL(node["href"]))))
+            urls.add(response.url.join(URL(node["href"])))
+        for url in urls:
+            self.schedule_task(self.crawl_repo(url))
         self.logger.info("Waiting...")
