@@ -21,9 +21,9 @@ Features
 ========
 
 * Useful http client out of box
-* Things(request, response and item) can though pipelines(in async or not)
-* Item extractor,  it`s easy to define and extract(by xpath, jpath or regex) one item we want from html, json or strings.
-* Custom "ensure_future" and "as_completed" api provide a easy work flow
+* Easy things(request, response and item) pipelines(in async or not)
+* Easy Item extractor, define data detail(by xpath, jpath or regex) and extract from html, json or strings.
+* Easy work flow
 
 Install
 =======
@@ -34,11 +34,11 @@ Install
 Usage
 =====
 
-Create one demo project by cli::
+Create one demo project::
 
     >>> ant_nest -c examples
 
-Then we have a project::
+Then we get a project::
 
     drwxr-xr-x   5 bruce  staff  160 Jun 30 18:24 ants
     -rw-r--r--   1 bruce  staff  208 Jun 26 22:59 settings.py
@@ -140,7 +140,7 @@ Run it! (without debug log)::
     INFO:GithubAnt:Get 6 dict in total
     INFO:GithubAnt:Run GithubAnt in 18.157656 seconds
 
-So, it`s easy to config ant by class attribute ::
+So, it`s easy to config one ant by class attribute ::
 
     class Ant(abc.ABC):
         response_pipelines: typing.List[Pipeline] = []
@@ -159,7 +159,7 @@ So, it`s easy to config ant by class attribute ::
         connection_limit_per_host = 0
         concurrent_limit = 100
 
-And you can rewrite some config for one request ::
+And we can rewrite some config for one request ::
 
     async def request(
         self,
@@ -180,8 +180,8 @@ And you can rewrite some config for one request ::
 About Item
 ==========
 
-We use dict to store one item in examples, actually it support many way to define our item:
-dict, normal class, atrrs`s class, data class and ORM class, it depend on your need and choice.
+We use dict to store one item in examples, actually it support many way:
+dict, normal class, atrrs's class, data class and ORM class, it depend on your need and choice.
 
 Examples
 ========
@@ -193,7 +193,7 @@ Defect
 
 * Complex exception handle
 
-one coroutine`s exception will break await chain especially in a loop, unless we handle it by hand. eg::
+one coroutine's exception will break await chain especially in a loop, unless we handle it by hand. eg::
 
     for cor in self.as_completed((self.crawl(url) for url in self.urls)):
         try:
