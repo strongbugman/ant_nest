@@ -1,13 +1,11 @@
 import os
 import io
-import asyncio
 
 import pytest
-from yarl import URL
+import httpx
 import aiofiles
 
 from ant_nest import pipelines as pls
-from ant_nest.things import Request
 from ant_nest.exceptions import ThingDropped
 from .test_things import fake_response
 
@@ -15,7 +13,7 @@ from .test_things import fake_response
 @pytest.mark.asyncio
 async def test_pipeline():
     pl = pls.Pipeline()
-    pl.process(Request("GET", URL("https://test.com"), loop=asyncio.get_event_loop()))
+    pl.process(httpx.Request("GET", "https://test.com"))
 
 
 def test_response_filter_error_pipeline():
@@ -31,7 +29,7 @@ def test_response_filter_error_pipeline():
 
 def test_request_duplicate_filter_pipeline():
     pl = pls.RequestDuplicateFilterPipeline()
-    req = Request("GET", URL("http://test.com"), loop=asyncio.get_event_loop())
+    req = httpx.Request("GET", "http://test.com")
     assert pl.process(req) is req
     with pytest.raises(ThingDropped):
         pl.process(req)
@@ -89,7 +87,7 @@ async def test_item_json_dump_pipeline(item_cls):
 
 def test_request_user_agent_pipeline():
     pl = pls.RequestUserAgentPipeline(user_agent="ant")
-    req = Request("GET", URL("https://www.hi.com"), loop=asyncio.get_event_loop())
+    req = httpx.Request("GET", "https://www.hi.com")
     assert pl.process(req) is req
     assert req.headers["User-Agent"] == "ant"
 
@@ -99,7 +97,7 @@ def test_request_user_agent_pipeline():
 
 def test_request_random_user_agent_pipeline():
     pl = pls.RequestRandomUserAgentPipeline()
-    req = Request("GET", URL("https://www.hi.com"), loop=asyncio.get_event_loop())
+    req = httpx.Request("GET", "https://www.hi.com")
     assert pl.process(req) is req
     assert req.headers.get("User-Agent") is not None
 

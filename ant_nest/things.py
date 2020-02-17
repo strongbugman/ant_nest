@@ -1,75 +1,10 @@
 """Provide Ant`s Request, Response, Item and Extractor."""
 import typing
-import os
 from collections.abc import MutableMapping
-import tempfile
-import webbrowser
 
-from aiohttp import ClientResponse, ClientRequest, hdrs
-from aiohttp.typedefs import LooseHeaders
-import ujson
+import httpx
 
 from .exceptions import ItemGetValueError
-
-
-class Request(ClientRequest):
-    def __init__(
-        self,
-        *args,
-        timeout: float = 60,
-        response_in_stream: bool = False,
-        headers: typing.Optional[LooseHeaders] = None,
-        data: typing.Any = None,
-        **kwargs,
-    ) -> None:
-        super().__init__(*args, headers=headers, data=data, **kwargs)
-
-        if headers is None or hdrs.HOST not in headers:
-            self.headers.pop(hdrs.HOST)
-
-        self.response_in_stream = response_in_stream
-        self.timeout = timeout
-        self.data = data
-
-
-class Response(ClientResponse):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._text = None
-        self._html_element = None
-        self._json = None
-
-    def get_text(
-        self, encoding: typing.Optional[str] = None, errors: str = "strict"
-    ) -> str:
-
-        if self._body is None:
-            raise ValueError("Read stream first")
-        if self._text is None:
-            if encoding is None:
-                encoding = self.get_encoding()
-            self._text = self._body.decode(encoding, errors=errors)
-        return self._text
-
-    @property
-    def simple_text(self) -> str:
-        return self.get_text(errors="ignore")
-
-    def get_json(self, loads: typing.Callable = ujson.loads) -> typing.Any:
-        if self._json is None:
-            self._json = loads(self.simple_text)
-        return self._json
-
-    @property
-    def simple_json(self) -> typing.Any:
-        return self.get_json()
-
-    def open_in_browser(self, file_type: str = ".html") -> bool:
-        fd, path = tempfile.mkstemp(file_type)
-        if self._body:
-            os.write(fd, self._body)
-        os.close(fd)
-        return webbrowser.open("file://" + path)
 
 
 class CustomNoneType:
@@ -111,7 +46,7 @@ class ItemExtractor:
     ):
         self.extractors[key] = extractor
 
-    def extract(self, res: Response) -> Item:
+    def extract(self, res: httpx.Response) -> Item:
         item = self.item_cls()
         for key, extractor in self.extractors.items():
             set_value_to_item(item, key, extractor(res))
@@ -123,19 +58,17 @@ class ItemNestExtractor(ItemExtractor):
     def __init__(
         self,
         item_class: typing.Type[Item],
-        root_extractor: typing.Callable[[Response], typing.Sequence],
+        root_extractor: typing.Callable[[httpx.Response], typing.Sequence],
     ):
         self.root_extractor = root_extractor
         super().__init__(item_class)
 
-    def extract_items(self, res: Response) -> typing.Generator[Item, None, None]:
+    def extract_items(self, res: httpx.Response) -> typing.Generator[Item, None, None]:
         for node in self.root_extractor(res):
             yield super().extract(node)
 
 
 __all__ = [
-    "Request",
-    "Response",
     "Item",
     "ItemExtractor",
     "ItemNestExtractor",

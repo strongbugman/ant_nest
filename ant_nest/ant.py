@@ -4,23 +4,22 @@ import abc
 import itertools
 import logging
 import time
-import random
 from collections import defaultdict
 from asyncio.queues import Queue, QueueEmpty
 from itertools import islice
 
-import aiohttp
-from aiohttp import ClientSession
-from yarl import URL
-from tenacity import retry
-from tenacity.retry import retry_if_result, retry_if_exception_type
-from tenacity.wait import wait_fixed
-from tenacity.stop import stop_after_attempt
+import httpx
 
 from .pipelines import Pipeline
-from .things import Request, Response, Item
+from .things import Item
 from .exceptions import ThingDropped
-from .utils import run_cor_func
+from . import utils
+
+try:
+    import settings
+except ImportError:
+    from . import _settings_example as settings
+
 
 __all__ = ["Ant", "CliAnt"]
 
@@ -29,24 +28,13 @@ class Ant(abc.ABC):
     response_pipelines: typing.List[Pipeline] = []
     request_pipelines: typing.List[Pipeline] = []
     item_pipelines: typing.List[Pipeline] = []
-    request_cls = Request
-    response_cls = Response
-    request_timeout = 60
-    request_retries = 3
-    request_retry_delay = 5
-    request_proxies: typing.List[typing.Union[str, URL]] = []
-    request_max_redirects = 10
-    request_allow_redirects = True
-    response_in_stream = False
-    connection_limit = 10  # see "TCPConnector" in "aiohttp"
-    connection_limit_per_host = 0
     concurrent_limit = 100
 
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None):
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.session: typing.Optional[aiohttp.ClientSession] = None
-        # coroutine`s concurrency support
+        self.client = httpx.Client(**settings.HTTPX_CONFIG)
+        # background coroutine job config
         self._queue: Queue = Queue(loop=self.loop)
         self._done_queue: Queue = Queue(loop=self.loop)
         self._running_count = 0
@@ -72,58 +60,40 @@ class Ant(abc.ABC):
 
     async def request(
         self,
-        url: typing.Union[str, URL],
-        method: str = aiohttp.hdrs.METH_GET,
-        params: typing.Optional[dict] = None,
-        headers: typing.Optional[dict] = None,
-        cookies: typing.Optional[dict] = None,
-        data: typing.Optional[
-            typing.Union[typing.AnyStr, typing.Dict, typing.IO]
-        ] = None,
-        proxy: typing.Optional[typing.Union[str, URL]] = None,
+        url: str,
+        method: str = "get",
+        data: httpx.models.RequestData = None,
+        files: httpx.models.RequestFiles = None,
+        json: typing.Any = None,
+        params: httpx.models.QueryParamTypes = None,
+        headers: httpx.models.HeaderTypes = None,
+        cookies: httpx.models.CookieTypes = None,
+        auth: httpx.models.AuthTypes = None,
         timeout: typing.Optional[float] = None,
-        retries: typing.Optional[int] = None,
-        response_in_stream: typing.Optional[bool] = None,
-    ) -> Response:
-        url = url if isinstance(url, URL) else URL(url)
-        proxy = proxy if proxy else self.get_proxy()
-        if proxy and not isinstance(proxy, URL):
-            proxy = URL(proxy)
-        timeout = timeout if timeout else self.request_timeout
-        retries = retries if retries is not None else self.request_retries
-        response_in_stream = (
-            response_in_stream
-            if response_in_stream is not None
-            else self.response_in_stream
-        )
-
-        req: Request = await self._handle_thing_with_pipelines(
-            self.request_cls(
+        stream: typing.Optional[bool] = None,
+        retries: typing.Optional[int] = 3,
+        retry_delay: typing.Optional[float] = 5,
+    ) -> httpx.Response:
+        request: httpx.Request = await self._handle_thing_with_pipelines(
+            self.client.build_request(
                 method,
                 url,
-                timeout=timeout,
                 params=params,
                 headers=headers,
                 cookies=cookies,
                 data=data,
-                proxy=proxy,
-                response_in_stream=response_in_stream,
-                loop=self.loop,
+                files=files,
+                json=json,
             ),
             self.request_pipelines,
         )
-        self.report(req)
 
         if retries > 0:
-            res = await self.make_retry_decorator(retries, self.request_retry_delay)(
-                self._request
-            )(req)
+            return await utils.retry(retries, retry_delay)(self._send)(
+                request, auth=auth, timeout=timeout, stream=stream
+            )
         else:
-            res = await self._request(req)
-
-        res = await self._handle_thing_with_pipelines(res, self.response_pipelines)
-        self.report(res)
-        return res
+            return await self._send(request, auth=auth, timeout=timeout, stream=stream)
 
     async def collect(self, item: Item):
         self.logger.debug("Collect item: " + str(item))
@@ -135,7 +105,7 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(
             self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
-            await run_cor_func(pipeline.on_spider_open)
+            await utils.run_cor_func(pipeline.on_spider_open)
 
     async def close(self):
         await self.wait_scheduled_tasks()
@@ -143,10 +113,9 @@ class Ant(abc.ABC):
         for pipeline in itertools.chain(
             self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
-            await run_cor_func(pipeline.on_spider_close)
+            await utils.run_cor_func(pipeline.on_spider_close)
 
-        if self.session:
-            await self.session.close()
+        await self.client.close()
 
         self._is_closed = True
         self.logger.info("Closed")
@@ -156,15 +125,11 @@ class Ant(abc.ABC):
         """App custom entrance"""
 
     async def main(self):
-        try:
+        with utils.suppress(self.logger):
             await self.open()
             await self.run()
-        except Exception as e:
-            self.logger.exception("Run ant with " + e.__class__.__name__)
-        try:
+        with utils.suppress(self.logger):
             await self.close()
-        except Exception as e:
-            self.logger.exception("Close ant with " + e.__class__.__name__)
         # total report
         for name, counts in self._reports.items():
             self.logger.info("Get {:d} {:s} in total".format(counts[1], name))
@@ -175,26 +140,6 @@ class Ant(abc.ABC):
                 self.__class__.__name__, time.time() - self._start_time
             )
         )
-
-    @staticmethod
-    def make_retry_decorator(
-        retries: int, delay: float
-    ) -> typing.Callable[[typing.Callable], typing.Callable]:
-        return retry(
-            wait=wait_fixed(delay),
-            retry=(
-                retry_if_result(lambda res: res.status >= 500)
-                | retry_if_exception_type(exception_types=aiohttp.ClientError)
-            ),
-            stop=stop_after_attempt(retries + 1),
-        )
-
-    def get_proxy(self) -> typing.Optional[URL]:
-        """Chose a proxy, default by random"""
-        try:
-            return URL(random.choice(self.request_proxies))
-        except IndexError:
-            return None
 
     def schedule_task(self, coroutine: typing.Awaitable):
         """Like "asyncio.ensure_future", with concurrent count limit
@@ -341,46 +286,35 @@ class Ant(abc.ABC):
         raw_thing = thing
         for pipeline in pipelines:
             try:
-                thing = await run_cor_func(pipeline.process, thing)
+                thing = await utils.run_cor_func(pipeline.process, thing)
             except Exception as e:
                 if isinstance(e, ThingDropped):
                     self.report(raw_thing, dropped=True)
                 raise e
         return thing
 
-    async def _request(self, req: Request) -> Response:
-        if self.session is None:
-            self.session = ClientSession(
-                response_class=self.response_cls,
-                connector=aiohttp.TCPConnector(
-                    limit=self.connection_limit,
-                    enable_cleanup_closed=True,
-                    limit_per_host=self.connection_limit_per_host,
-                ),
-            )
+    async def _send(
+        self,
+        req: httpx.Request,
+        *,
+        auth: httpx.models.AuthTypes,
+        timeout: float,
+        stream: bool,
+    ) -> httpx.Response:
+        self.report(req)
 
-        if req.proxy is not None:
-            # proxy auth not work in one session with many requests,
-            # add auth header to fix it
-            auth = aiohttp.BasicAuth.from_url(req.proxy)
-            if req.proxy.scheme == "http" and auth is not None:
-                req.headers[aiohttp.hdrs.PROXY_AUTHORIZATION] = auth.encode()
-
-        # cookies in headers, params in url
-        response: typing.Any = await self.session._request(
-            req.method,
-            req.url,
-            headers=req.headers,
-            data=req.data,
-            timeout=req.timeout,
-            proxy=req.proxy,
-            max_redirects=self.request_max_redirects,
-            allow_redirects=self.request_allow_redirects,
+        response: httpx.Response = await self.client.send(
+            req, auth=auth, timeout=timeout, stream=stream
         )
 
-        if not req.response_in_stream:
+        if not stream:
             await response.read()
-            await response.release()
+
+        response = await self._handle_thing_with_pipelines(
+            response, self.response_pipelines
+        )
+        self.report(response)
+
         return response
 
 

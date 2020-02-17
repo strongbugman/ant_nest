@@ -10,7 +10,7 @@ with open("ant_nest/__init__.py", "rt", encoding="utf8") as f:
         raise Exception("Version not found!")
 
 requires = [
-    "aiohttp>=3.3.0",
+    "httpx>=0.9",
     "tenacity>=4.8.0",
     "ujson>=1.3.4",
     "aiofiles>=0.3.1",

@@ -4,7 +4,7 @@ import asyncio
 from unittest import mock
 import re
 
-from yarl import URL
+import httpx
 import pytest
 import jpath
 from lxml import html
@@ -12,8 +12,6 @@ from lxml import html
 from ant_nest.ant import CliAnt
 from ant_nest.cli import get_ants
 from ant_nest.things import (
-    Response,
-    Request,
     ItemExtractor,
     set_value_to_item,
     get_value_from_item,
@@ -24,46 +22,7 @@ from ant_nest import cli
 
 
 def fake_response(content):
-    res = Response(
-        "GET",
-        URL("http://test.com"),
-        writer=None,
-        continue100=None,
-        timer=None,
-        request_info=None,
-        traces=None,
-        loop=asyncio.get_event_loop(),
-        session=None,
-    )
-    res._content = content
-    res._body = content
-
-    return res
-
-
-def test_request():
-    req = Request("GET", URL("http://test.com"), loop=asyncio.get_event_loop())
-    assert req.method == "GET"
-    req.__repr__()
-
-
-def test_response():
-    res = fake_response(b"1")
-    assert res.get_text(encoding="utf-8") == "1"
-    assert res.simple_text == "1"
-    assert res.simple_json == 1
-    # get text
-    res = fake_response(None)
-    with pytest.raises(ValueError):
-        res.get_text()
-    res = fake_response(b"1")
-    res.get_encoding = lambda: "utf-8"
-    res._get_encoding = lambda: "utf-8"
-    assert res.get_text() == "1"
-    # open in browser
-    res = fake_response(b"1")
-    with mock.patch("webbrowser.open", lambda *x, **y: True):
-        assert res.open_in_browser()
+    return httpx.Response(200, content=content)
 
 
 def test_set_get_item():

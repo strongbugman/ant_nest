@@ -7,10 +7,10 @@ import random
 import re
 
 import aiofiles
-from aiohttp.http import SERVER_SOFTWARE
-from aiohttp import hdrs
+from httpx import Request, Response
+from httpx.config import USER_AGENT
 
-from .things import Response, Request, Item, set_value_to_item, get_value_from_item
+from .things import Item, set_value_to_item, get_value_from_item
 from .exceptions import ThingDropped
 from .utils import run_cor_func
 
@@ -37,7 +37,7 @@ class Pipeline:
 # Response pipelines
 class ResponseFilterErrorPipeline(Pipeline):
     def process(self, thing: Response) -> Response:
-        if thing.status >= 400:
+        if thing.status_code >= 400:
             raise ThingDropped("Response - {:s}".format(str(thing)))
         else:
             return thing
@@ -68,8 +68,8 @@ class RequestUserAgentPipeline(Pipeline):
         self.user_agent = user_agent
 
     def process(self, thing: Request) -> Request:
-        if thing.headers.get(hdrs.USER_AGENT) == SERVER_SOFTWARE:
-            thing.headers[hdrs.USER_AGENT] = self.user_agent
+        if thing.headers.get("user-agent") == USER_AGENT:
+            thing.headers["user-agent"] = self.user_agent
         return thing
 
 
@@ -164,8 +164,8 @@ class RequestRandomUserAgentPipeline(Pipeline):
         )
 
     def process(self, thing: Request) -> Request:
-        if thing.headers.get(hdrs.USER_AGENT) == SERVER_SOFTWARE:
-            thing.headers[hdrs.USER_AGENT] = self.create()
+        if thing.headers.get("user-agent") == USER_AGENT:
+            thing.headers["user-agent"] = self.create()
         return thing
 
 
