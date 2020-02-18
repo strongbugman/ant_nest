@@ -2,7 +2,6 @@ from ant_nest.ant import Ant
 from ant_nest.pipelines import ItemFieldReplacePipeline
 from bs4 import BeautifulSoup
 from lxml import html
-from yarl import URL
 
 
 class GithubAnt(Ant):
@@ -13,14 +12,13 @@ class GithubAnt(Ant):
             ("meta_content", "star", "fork"), excess_chars=("\r", "\n", "\t", "  ")
         )
     ]
-    concurrent_limit = 1  # save the website`s and your bandwidth!
 
     async def crawl_repo(self, url):
         """Crawl information from one repo"""
         response = await self.request(url)
         # extract item from response
         item = dict()
-        element = html.fromstring(response.simple_text)
+        element = html.fromstring(response.text)
         item["title"] = element.xpath("//h1/strong/a/text()")[0]
         item["author"] = element.xpath("//h1/span/a/text()")[0]
         item["meta_content"] = "".join(
@@ -38,12 +36,12 @@ class GithubAnt(Ant):
     async def run(self):
         """App entrance, our play ground"""
         response = await self.request("https://github.com/explore")
-        soup = BeautifulSoup(response.simple_text, "html.parser")
+        soup = BeautifulSoup(response.text, "html.parser")
         urls = set()
         for node in soup.main.find_all(
             "a", **{"data-ga-click": "Explore, go to repository, location:explore feed"}
         ):
-            urls.add(response.url.join(URL(node["href"])))
+            urls.add(response.url.join(node["href"]))
         for url in urls:
             self.schedule_task(self.crawl_repo(url))
         self.logger.info("Waiting...")

@@ -4,10 +4,9 @@ version=`python -c 'import ant_nest; print(ant_nest.__version__)'`
 
 prepare_test_env:
 	docker run --name test_httpbin --rm -d -p 8080:80 kennethreitz/httpbin@sha256:ebfa1bd104bc80c4da84da4a2a3abfb0dbd82d7bb536bb51000c1b330d8dc34f
-	docker run --name test_squid --rm -d -p 3128:3128 -v `pwd`/tests/squid.conf:/etc/squid/squid.conf -v `pwd`/tests/squid.htpasswd:/etc/squid/squid.htpasswd minimum2scp/squid
 
 destroy_test_env:
-	docker stop test_httpbin test_squid
+	docker stop test_httpbin
 
 test:
 	black ant_nest tests examples setup.py --check

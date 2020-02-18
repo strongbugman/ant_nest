@@ -1,6 +1,5 @@
 import sys
 import os
-import asyncio
 from unittest import mock
 import re
 
@@ -21,10 +20,6 @@ from ant_nest.exceptions import ThingDropped, ItemGetValueError, ExceptionFilter
 from ant_nest import cli
 
 
-def fake_response(content):
-    return httpx.Response(200, content=content)
-
-
 def test_set_get_item():
     class ClsItem:
         pass
@@ -38,8 +33,7 @@ def test_set_get_item():
 
 def test_extract_item():
     with open("./tests/test.html", "rb") as f:
-        response = fake_response(f.read())
-        response.get_text(encoding="utf-8")
+        response = httpx.Response(200, content=f.read())
 
     class Item:
         pass
@@ -48,33 +42,29 @@ def test_extract_item():
     item_extractor = ItemExtractor(Item)
     item_extractor.add_extractor(
         "paragraph",
-        lambda x: html.fromstring(x.simple_text).xpath("/html/body/div/p/text()")[0],
+        lambda x: html.fromstring(x.text).xpath("/html/body/div/p/text()")[0],
     )
     item_extractor.add_extractor(
-        "title", lambda x: re.findall(r"<title>([A-Z a-z]+)</title>", x.simple_text)[0]
+        "title", lambda x: re.findall(r"<title>([A-Z a-z]+)</title>", x.text)[0]
     )
     item = item_extractor.extract(response)
     assert item.paragraph == "test"
     assert item.title == "Test html"
     # extract with jpath
-    response = fake_response(b'{"a": {"b": {"c": 1}}, "d": null}')
-    response.get_text(encoding="utf-8")
+    response = httpx.Response(200, content=b'{"a": {"b": {"c": 1}}, "d": null}')
     item_extractor = ItemExtractor(Item)
     item_extractor.add_extractor(
-        "author", lambda x: jpath.get_all("a.b.c", x.simple_json)[0]
+        "author", lambda x: jpath.get_all("a.b.c", x.json())[0]
     )
-    item_extractor.add_extractor(
-        "freedom", lambda x: jpath.get_all("d", x.simple_json)[0]
-    )
+    item_extractor.add_extractor("freedom", lambda x: jpath.get_all("d", x.json())[0])
     item = item_extractor.extract(response)
     assert item.author == 1
     assert item.freedom is None
     # ItemNestExtractor tests
     with open("./tests/test.html", "rb") as f:
-        response = fake_response(f.read())
-        response.get_text(encoding="utf-8")
+        response = httpx.Response(200, content=f.read())
     item_nest_extractor = ItemNestExtractor(
-        Item, lambda x: html.fromstring(x.simple_text).xpath('//div[@id="nest"]/div')
+        Item, lambda x: html.fromstring(x.text).xpath('//div[@id="nest"]/div')
     )
     item_nest_extractor.add_extractor("xpath_key", lambda x: x.xpath("./p/text()")[0])
     item_nest_extractor.add_extractor(

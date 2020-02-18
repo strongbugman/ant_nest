@@ -11,17 +11,12 @@ from tenacity.wait import wait_fixed
 from tenacity.stop import stop_after_attempt
 
 
-def default(value, default_value):
-    return value if value is not None else default_value
-
-
 def retry(
-    retries: typing.Optional[int], delay: typing.Optional[float]
+    retries: int, delay: float
 ) -> typing.Callable[[typing.Callable], typing.Callable]:
-    retries = default(retries, 3)
-    delay = default(delay, 5)
-
-    return _retry(wait=wait_fixed(delay), stop=stop_after_attempt(retries + 1),)
+    return _retry(
+        wait=wait_fixed(delay), stop=stop_after_attempt(retries + 1), reraise=True
+    )
 
 
 async def run_cor_func(func: typing.Callable, *args, **kwargs) -> typing.Any:

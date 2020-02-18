@@ -123,59 +123,67 @@ Run it! (without debug log)::
     INFO:GithubAnt:Opening
     INFO:GithubAnt:Waiting...
     INFO:GithubAnt:**********************************************************************I got one hot repo!
-    {'title': 'NLP-progress', 'author': 'sebastianruder', 'meta_content': 'Repository to track the progress in Natural Language Processing (NLP), including the datasets and the current state-of-the-art for the most common NLP tasks.', 'star': '3,743', 'fork': '327', 'origin_url': URL('https://github.com/sebastianruder/NLP-progress')}
+    {'title': 'app-ideas', 'author': 'florinpop17', 'meta_content': 'A Collection of application ideas which can be used to improve your coding skills.', 'star': '11.7k', 'fork': '500', 'origin_url': URL('https://github.com/florinpop17/app-ideas')}
     INFO:GithubAnt:**********************************************************************I got one hot repo!
-    {'title': 'material-dashboard', 'author': 'creativetimofficial', 'meta_content': 'Material Dashboard - Open Source Bootstrap 4 Material Design Adminhttps://demos.creative-tim.com/materi…', 'star': '6,032', 'fork': '187', 'origin_url': URL('https://github.com/creativetimofficial/material-dashboard')}
+    {'title': 'Carbon', 'author': 'briannesbitt', 'meta_content': 'A simple PHP API extension for DateTime.https://carbon.nesbot.com/', 'star': '14k', 'fork': '249', 'origin_url': URL('https://github.com/briannesbitt/Carbon')}
     INFO:GithubAnt:**********************************************************************I got one hot repo!
-    {'title': 'mkcert', 'author': 'FiloSottile', 'meta_content': "A simple zero-config tool to make locally-trusted development certificates with any names you'd like.", 'star': '2,311', 'fork': '60', 'origin_url': URL('https://github.com/FiloSottile/mkcert')}
+    {'title': 'org-roam', 'author': 'jethrokuan', 'meta_content': 'Rudimentary Roam replica with Org-modehttps://org-roam.readthedocs.io/en/la…', 'star': '261', 'fork': '27', 'origin_url': URL('https://github.com/jethrokuan/org-roam')}
     INFO:GithubAnt:**********************************************************************I got one hot repo!
-    {'title': 'pure-bash-bible', 'author': 'dylanaraps', 'meta_content': '📖 A collection of pure bash alternatives to external processes.', 'star': '6,385', 'fork': '210', 'origin_url': URL('https://github.com/dylanaraps/pure-bash-bible')}
+    {'title': 'joplin', 'author': 'laurent22', 'meta_content': 'Joplin - an open source note taking and to-do application with synchronization capabilities for Windows, macOS, Linux, Android and iOS. Forum: https://discourse.joplinapp.org/https://joplinapp.org', 'star': '13k', 'fork': '335', 'origin_url': URL('https://github.com/laurent22/joplin')}
     INFO:GithubAnt:**********************************************************************I got one hot repo!
-    {'title': 'flutter', 'author': 'flutter', 'meta_content': 'Flutter makes it easy and fast to build beautiful mobile apps.https://flutter.io', 'star': '30,579', 'fork': '1,337', 'origin_url': URL('https://github.com/flutter/flutter')}
+    {'title': 'snoop', 'author': 'snooppr', 'meta_content': 'Snoop — инструмент разведки на основе открытых данных', 'star': '281', 'fork': '9', 'origin_url': URL('https://github.com/snooppr/snoop')}
     INFO:GithubAnt:**********************************************************************I got one hot repo!
-    {'title': 'Java-Interview', 'author': 'crossoverJie', 'meta_content': '👨\u200d🎓 Java related : basic, concurrent, algorithm https://crossoverjie.top/categories/J…', 'star': '4,687', 'fork': '409', 'origin_url': URL('https://github.com/crossoverJie/Java-Interview')}
+    {'title': '1on1-questions', 'author': 'VGraupera', 'meta_content': 'Mega list of 1 on 1 meeting questions compiled from a variety to sources', 'star': '4k', 'fork': '93', 'origin_url': URL('https://github.com/VGraupera/1on1-questions')}
+    INFO:GithubAnt:Get 8 Request in total with 8/60s rate
+    INFO:GithubAnt:Get 7 Response in total with 7/60s rate
+    INFO:GithubAnt:Get 6 dict in total with 6/60s rate
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'python-small-examples', 'author': 'jackzhenguo', 'meta_content': 'Python有趣的小例子一网打尽。Python基础、Python坑点、Python字符串和正则、Python绘图、Python日期和文件、Web开发、数据科学、机器学习、深度2.4k', 'fork': '102', 'origin_url': URL('https://github.com/jackzhenguo/python-small-examples')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'system-design-primer', 'author': 'donnemartin', 'meta_content': 'Learn how to design large-scale systems. Prep for the system design interview. Includes Anki flashcards.', 'star': '83.2k', 'fork': '4.4k', 'origin_url': URL('https://github.com/donnemartin/system-design-primer')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'awesome-scalability', 'author': 'binhnguyennus', 'meta_content': 'The Patterns of Scalable, Reliable, and Performant Large-Scale Systemshttp://awesome-scalability.com/', 'star': '24.5k', 'fork': '1.4k', 'origin_url': URL('https://github.com/binhnguyennus/awesome-scalability')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'gdb-frontend', 'author': 'rohanrhu', 'meta_content': '☕ GDBFrontend is an easy, flexible and extensionable gui debugger.https://oguzhaneroglu.com/projects/gd…', 'star': '716', 'fork': '14', 'origin_url': URL('https://github.com/rohanrhu/gdb-frontend')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'Complete-Python-3-Bootcamp', 'author': 'Pierian-Data', 'meta_content': 'Course Files for Complete Python 3 Bootcamp Course on Udemy', 'star': '8.1k', 'fork': '1.8k', 'origin_url': URL('https://github.com/Pierian-Data/Complete-Python-3-Bootcamp')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'leon', 'author': 'leon-ai', 'meta_content': '\U0001f9e0 Leon is your open-source personal assistant.https://getleon.ai', 'star': '6.3k', 'fork': '147', 'origin_url': URL('https://github.com/leon-ai/leon')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'esbuild', 'author': 'evanw', 'meta_content': 'An extremely fast JavaScript bundler and minifier', 'star': '2.3k', 'fork': '38', 'origin_url': URL('https://github.com/evanw/esbuild')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'wearable-microphone-jamming', 'author': 'y-x-c', 'meta_content': 'Repository for our paper Wearable Microphone Jamminghttp://sandlab.cs.uchicago.edu/jammer/', 'star': '138', 'fork': '10', 'origin_url': URL('https://github.com/y-x-c/wearable-microphone-jamming')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'efcore', 'author': 'dotnet', 'meta_content': 'EF Core is a modern object-database mapper for .NET. It supports LINQ queries, change tracking, updates, and schema migrations.https://docs.microsoft.com/ef/core/', 'star': '8.7k', 'fork': '965', 'origin_url': URL('https://github.com/dotnet/efcore')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'playwright', 'author': 'microsoft', 'meta_content': 'Node library to automate Chromium, Firefox and WebKit with a single APIhttps://www.npmjs.com/package/playwright', 'star': '9k', 'fork': '92', 'origin_url': URL('https://github.com/microsoft/playwright')}
+    INFO:GithubAnt:Get 18 Request in total with 10/60s rate
+    INFO:GithubAnt:Get 17 Response in total with 10/60s rate
+    INFO:GithubAnt:Get 16 dict in total with 10/60s rate
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'degoogle', 'author': 'tycrek', 'meta_content': 'A huge list of alternatives to Google products. Privacy tips, tricks, and links.https://degoogle.jmoore.dev', 'star': '2k', 'fork': '50', 'origin_url': URL('https://github.com/tycrek/degoogle')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'sherlock', 'author': 'sherlock-project', 'meta_content': '🔎 Hunt down social media accounts by username across social networkshttp://sherlock-project.github.io', 'star': '10.4k', 'fork': '207', 'origin_url': URL('https://github.com/sherlock-project/sherlock')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'the-art-of-command-line', 'author': 'jlevy', 'meta_content': 'Master the command line, in one page', 'star': '68.9k', 'fork': '2.2k', 'origin_url': URL('https://github.com/jlevy/the-art-of-command-line')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'freespeech', 'author': 'Merkie', 'meta_content': 'A free program designed to help the non-verbal.', 'star': '168', 'fork': '20', 'origin_url': URL('https://github.com/Merkie/freespeech')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'awesome-pentest', 'author': 'enaqx', 'meta_content': 'A collection of awesome penetration testing resources, tools and other shiny things', 'star': '11.4k', 'fork': '1k', 'origin_url': URL('https://github.com/enaqx/awesome-pentest')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'trax', 'author': 'google', 'meta_content': 'Trax — your path to advanced deep learning', 'star': '2.7k', 'fork': '90', 'origin_url': URL('https://github.com/google/trax')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'introtodeeplearning', 'author': 'aamini', 'meta_content': 'Lab Materials for MIT 6.S191: Introduction to Deep Learning', 'star': '1.6k', 'fork': '116', 'origin_url': URL('https://github.com/aamini/introtodeeplearning')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': 'CleanArchitecture', 'author': 'ardalis', 'meta_content': 'A starting point for Clean Architecture with ASP.NET Core', 'star': '3.8k', 'fork': '300', 'origin_url': URL('https://github.com/ardalis/CleanArchitecture')}
+    INFO:GithubAnt:**********************************************************************I got one hot repo!
+    {'title': '3y', 'author': 'ZhongFuCheng3y', 'meta_content': '📓从Java基础、JavaWeb基础到常用的框架再到面试题都有完整的教程，几乎涵盖了Java后端必备的知识点', 'star': '5.1k', 'fork': '285', 'origin_url': URL('https://github.com/ZhongFuCheng3y/3y')}
     INFO:GithubAnt:Closed
-    INFO:GithubAnt:Get 7 Request in total
-    INFO:GithubAnt:Get 7 Response in total
-    INFO:GithubAnt:Get 6 dict in total
-    INFO:GithubAnt:Run GithubAnt in 18.157656 seconds
+    INFO:GithubAnt:Get 26 Request in total
+    INFO:GithubAnt:Get 26 Response in total
+    INFO:GithubAnt:Get 25 dict in total
+    INFO:GithubAnt:Run GithubAnt in 180.234251 seconds
 
-So, it`s easy to config one ant by class attribute ::
-
-    class Ant(abc.ABC):
-        response_pipelines: typing.List[Pipeline] = []
-        request_pipelines: typing.List[Pipeline] = []
-        item_pipelines: typing.List[Pipeline] = []
-        request_cls = Request
-        response_cls = Response
-        request_timeout = 60
-        request_retries = 3
-        request_retry_delay = 5
-        request_proxies: typing.List[typing.Union[str, URL]] = []
-        request_max_redirects = 10
-        request_allow_redirects = True
-        response_in_stream = False
-        connection_limit = 10  # see "TCPConnector" in "aiohttp"
-        connection_limit_per_host = 0
-        concurrent_limit = 100
-
-And we can rewrite some config for one request ::
-
-    async def request(
-        self,
-        url: typing.Union[str, URL],
-        method: str = aiohttp.hdrs.METH_GET,
-        params: typing.Optional[dict] = None,
-        headers: typing.Optional[dict] = None,
-        cookies: typing.Optional[dict] = None,
-        data: typing.Optional[
-            typing.Union[typing.AnyStr, typing.Dict, typing.IO]
-        ] = None,
-        proxy: typing.Optional[typing.Union[str, URL]] = None,
-        timeout: typing.Optional[float] = None,
-        retries: typing.Optional[int] = None,
-        response_in_stream: typing.Optional[bool] = None,
-    ) -> Response:
 
 About Item
 ==========

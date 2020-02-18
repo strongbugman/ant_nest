@@ -26,6 +26,12 @@ HTTPX_CONFIG = {
 }
 
 
+# ANT config
+JOB_LIMIT = 50
+HTTP_RETRIES = 0
+HTTP_RETRY_DELAY = 0.1
+
+
 if ANT_ENV in ("development", "testing"):
     logging.basicConfig(level=logging.DEBUG)
     asyncio.get_event_loop().set_debug(True)

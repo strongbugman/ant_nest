@@ -1,4 +1,3 @@
-from yarl import URL
 from bs4 import BeautifulSoup
 from lxml import html
 from ant_nest.ant import Ant
@@ -20,30 +19,28 @@ class GithubAnt(Ant):
         super().__init__()
         self.item_extractor = ItemExtractor(dict)
         self.item_extractor.add_extractor(
-            "title",
-            lambda x: html.fromstring(x.simple_text).xpath("//h1/strong/a/text()")[0],
+            "title", lambda x: html.fromstring(x.text).xpath("//h1/strong/a/text()")[0],
         )
         self.item_extractor.add_extractor(
-            "author",
-            lambda x: html.fromstring(x.simple_text).xpath("//h1/span/a/text()")[0],
+            "author", lambda x: html.fromstring(x.text).xpath("//h1/span/a/text()")[0],
         )
         self.item_extractor.add_extractor(
             "meta_content",
             lambda x: "".join(
-                html.fromstring(x.simple_text).xpath(
+                html.fromstring(x.text).xpath(
                     '//div[@class="repository-content "]/div[2]//text()'
                 )
             ),
         )
         self.item_extractor.add_extractor(
             "star",
-            lambda x: html.fromstring(x.simple_text).xpath(
+            lambda x: html.fromstring(x.text).xpath(
                 '//a[@class="social-count js-social-count"]/text()'
             )[0],
         )
         self.item_extractor.add_extractor(
             "fork",
-            lambda x: html.fromstring(x.simple_text).xpath(
+            lambda x: html.fromstring(x.text).xpath(
                 '//a[@class="social-count"]/text()'
             )[0],
         )
@@ -62,12 +59,12 @@ class GithubAnt(Ant):
     async def run(self):
         """App entrance, our play ground"""
         response = await self.request("https://github.com/explore")
-        soup = BeautifulSoup(response.simple_text, "html.parser")
+        soup = BeautifulSoup(response.text, "html.parser")
         urls = set()
         for node in soup.main.find_all(
             "a", **{"data-ga-click": "Explore, go to repository, location:explore feed"}
         ):
-            urls.add(response.url.join(URL(node["href"])))
+            urls.add(response.url.join(node["href"]))
         for url in urls:
             self.schedule_task(self.crawl_repo(url))
         self.logger.info("Waiting...")

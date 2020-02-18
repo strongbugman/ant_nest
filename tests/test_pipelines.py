@@ -7,7 +7,6 @@ import aiofiles
 
 from ant_nest import pipelines as pls
 from ant_nest.exceptions import ThingDropped
-from .test_things import fake_response
 
 
 @pytest.mark.asyncio
@@ -18,10 +17,8 @@ async def test_pipeline():
 
 def test_response_filter_error_pipeline():
     pl = pls.ResponseFilterErrorPipeline()
-    res = fake_response(b"")
-    err_res = fake_response(b"")
-    res.status = 200
-    err_res.status = 403
+    res = httpx.Response(200, content=b"")
+    err_res = httpx.Response(403, content=b"")
     assert res is pl.process(res)
     with pytest.raises(ThingDropped):
         pl.process(err_res)

@@ -3,12 +3,11 @@ import os
 
 import pytest
 import httpx
-from tenacity import RetryError
 
 from ant_nest.pipelines import Pipeline
 from ant_nest.ant import CliAnt, Ant
 from ant_nest.exceptions import ThingDropped
-from .test_things import fake_response
+from ant_nest import _settings_example as settings
 
 
 @pytest.mark.asyncio
@@ -37,8 +36,8 @@ async def test_ant():
             await self.collect(object())
             assert self.item_pipelines[0].count == 1
 
-        async def _send(self, req, *args, **kwargs):
-            return fake_response(b"")
+        async def requset(self, *args, **kwargs):
+            return httpx.Response(200, content=b"")
 
     ant = TestAnt()
     assert ant.name == "TestAnt"
@@ -49,39 +48,6 @@ async def test_ant():
             raise Exception("This exception will be suppressed")
 
     await Test2Ant().main()
-
-
-@pytest.mark.asyncio
-async def test_ant_with_retry():
-    class Test2Ant(Ant):
-        def __init__(self):
-            super().__init__()
-            self.min_retries = 2
-            self.retries = 0
-
-        async def run(self):
-            pass
-
-        async def _send(self, req, *args, **kwargs):
-            if self.retries < self.min_retries:
-                self.retries += 1
-                raise httpx.exceptions.ConnectTimeout()
-            else:
-                return fake_response(b"")
-
-    ant = Test2Ant()
-    # default retry params
-    res = await ant.request("https://www.test.com", retry_delay=0.1)
-    assert res.status_code == 200
-    # set retry params
-    ant.retries = 0
-    with pytest.raises(RetryError):
-        await ant.request("https://www.test.com", retries=1, retry_delay=0.1)
-    # disable retry
-    ant.retries = 0
-    with pytest.raises(httpx.ConnectTimeout):
-        await ant.request("https://www.test.com", retries=0)
-    await ant.main()
 
 
 @pytest.mark.asyncio
@@ -118,24 +84,24 @@ async def test_pipelines():
 
 
 @pytest.mark.asyncio
-async def test_ant_report():
+async def test_ant_report(mocker):
     class FakePipeline(Pipeline):
         def process(self, thing):
-            if thing.host == "error":
+            if thing.url.host == "error":
                 raise ThingDropped
             return thing
 
     class FakeAnt(Ant):
         request_pipelines = [FakePipeline()]
-        request_retries = 0
 
         async def run(self):
             pass
 
-        async def _send(self, req, *args, **kwargs):
-            return fake_response(b"")
+    async def send(*args, **kwargs):
+        return httpx.Response(200, content=b"")
 
     ant = FakeAnt()
+    mocker.patch.object(ant._http_client, "send", new=send)
     # request report
     await ant.request("http://test.com")
     assert ant._reports["Request"][1] == 1
@@ -143,13 +109,6 @@ async def test_ant_report():
     with pytest.raises(ThingDropped):
         await ant.request("http://error")
     assert ant._drop_reports["Request"][1] == 1
-
-    ant._last_time -= ant._last_time + 1  # report
-    ant.report(httpx.Request("GET", "http://test"))
-    assert ant._reports["Request"][0] == 1
-    ant.report(httpx.Request("GET", "http://test"), dropped=True)
-    assert ant._drop_reports["Request"][0] == 1
-
     await ant.main()
 
 
@@ -168,77 +127,6 @@ async def test_with_real_send():
             assert res.json()["method"] == method
         else:
             assert res.text == ""
-        # short way
-        res = await ant.request(httpbin_base_url + "anything", method=method)
-        assert res.status_code == 200
-        if method != "HEAD":
-            assert res.json()["method"] == method
-        else:
-            assert res.text == ""
-    # params
-    res = await ant.request(httpbin_base_url + "get?k1=v1&k2=v2")
-    assert res.status_code == 200
-    assert res.json()["args"]["k1"] == "v1"
-    assert res.json()["args"]["k2"] == "v2"
-    res = await ant.request(httpbin_base_url + "get", params={"k1": "v1", "k2": "v2"})
-    assert res.status_code == 200
-    assert res.json()["args"]["k1"] == "v1"
-    assert res.json()["args"]["k2"] == "v2"
-    # data with str
-    res = await ant.request(httpbin_base_url + "post", data="Test data", method="POST")
-    assert res.status_code == 200
-    assert res.json()["data"] == "Test data"
-    # data with dict
-    res = await ant.request(httpbin_base_url + "post", method="POST", data={"k1": "v1"})
-    assert res.status_code == 200
-    assert res.json()["form"]["k1"] == "v1"
-    # data with bytes
-    res = await ant.request(httpbin_base_url + "post", method="POST", data=b"12345")
-    assert res.status_code == 200
-    assert res.json()["data"] == "12345"
-    # data with file
-    with open("tests/test.html", "r") as f:
-        file_content = f.read()
-        f.seek(0)
-        res = await ant.request(httpbin_base_url + "post", method="POST", files=f)
-        assert res.status_code == 200
-        assert res.json()["data"] == file_content
-    # headers
-    res = await ant.request(
-        httpbin_base_url + "headers", headers={"Custom-Key": "test"}
-    )
-    assert res.status_code == 200
-    assert res.headers["Content-Type"] == "application/json"
-    assert res.json()["headers"]["Custom-Key"] == "test"
-    # cookies
-    res = await ant.request(
-        httpbin_base_url + "cookies", cookies={"Custom-Key": "test"}
-    )
-    assert res.status_code == 200
-    assert res.json()["cookies"]["Custom-Key"] == "test"
-    # get cookies
-    ant.request_allow_redirects = False
-    res = await ant.request(httpbin_base_url + "cookies/set?k1=v1&k2=v2")
-    assert res.status_code == 302
-    assert res.cookies["k1"] == "v1"
-    assert res.cookies["k2"] == "v2"
-    # redirects
-    ant.request_allow_redirects = True
-    ant.request_max_redirects = 3
-    res = await ant.request(httpbin_base_url + "redirect/2")
-    assert res.status_code == 200
-    ## with http proxy
-    # proxy = os.getenv("TEST_HTTP_PROXY", "http://bugman:letmein@localhost:3128")
-    # ant.request_proxies.append(proxy)
-    # res = await ant.request("http://httpbin.org/anything")
-    # assert res.status_code == 200
-    ## no proxy anymore
-    # ant.request_proxies.pop()
-    # res = await ant.request("http://httpbin.org/anything")
-    # assert res.status_code == 200
-    ## set proxy by request
-    # res = await ant.request("http://httpbin.org/anything", proxy=proxy)
-    # assert res.status_code == 200
     # with stream
     res = await ant.request(httpbin_base_url + "anything", stream=True)
     assert res.status_code == 200
@@ -277,7 +165,7 @@ async def test_schedule_task():
         count += 1
         running_count -= 1
 
-    ant.concurrent_limit = concurrent_limit
+    settings.JOB_LIMIT = concurrent_limit
     ant.schedule_tasks(cor() for i in range(max_count))
     assert ant.is_running
     await ant.wait_scheduled_tasks()

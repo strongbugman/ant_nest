@@ -21,6 +21,7 @@ tests_requires = [
     "pytest>=3.3.1",
     "pytest-asyncio>=0.8.0",
     "pytest-cov>=2.5.1",
+    "pytest-mock>=2.0.0",
     "jpath>=1.6",
     "beautifulsoup4",
     "lxml>3.7.0",

@@ -1,3 +1,5 @@
+import os
+import sys
 import typing
 import asyncio
 import abc
@@ -15,11 +17,12 @@ from .things import Item
 from .exceptions import ThingDropped
 from . import utils
 
-try:
+pwd = os.getcwd()
+if os.path.exists(os.path.join(pwd, "settings.py")):
+    sys.path.append(pwd)
     import settings
-except ImportError:
+else:
     from . import _settings_example as settings
-
 
 __all__ = ["Ant", "CliAnt"]
 
@@ -28,12 +31,11 @@ class Ant(abc.ABC):
     response_pipelines: typing.List[Pipeline] = []
     request_pipelines: typing.List[Pipeline] = []
     item_pipelines: typing.List[Pipeline] = []
-    concurrent_limit = 100
 
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None):
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.client = httpx.Client(**settings.HTTPX_CONFIG)
+        self._http_client = httpx.Client(**settings.HTTPX_CONFIG)
         # background coroutine job config
         self._queue: Queue = Queue(loop=self.loop)
         self._done_queue: Queue = Queue(loop=self.loop)
@@ -69,31 +71,35 @@ class Ant(abc.ABC):
         headers: httpx.models.HeaderTypes = None,
         cookies: httpx.models.CookieTypes = None,
         auth: httpx.models.AuthTypes = None,
-        timeout: typing.Optional[float] = None,
-        stream: typing.Optional[bool] = None,
-        retries: typing.Optional[int] = 3,
-        retry_delay: typing.Optional[float] = 5,
+        stream: bool = False,
     ) -> httpx.Response:
-        request: httpx.Request = await self._handle_thing_with_pipelines(
-            self.client.build_request(
-                method,
-                url,
-                params=params,
-                headers=headers,
-                cookies=cookies,
-                data=data,
-                files=files,
-                json=json,
-            ),
-            self.request_pipelines,
+        request: httpx.Request = self._http_client.build_request(
+            method,
+            url,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            data=data,
+            files=files,
+            json=json,
         )
+        request = await self._handle_thing_with_pipelines(
+            request, self.request_pipelines
+        )
+        self.report(request)
 
-        if retries > 0:
-            return await utils.retry(retries, retry_delay)(self._send)(
-                request, auth=auth, timeout=timeout, stream=stream
-            )
-        else:
-            return await self._send(request, auth=auth, timeout=timeout, stream=stream)
+        response = await utils.retry(settings.HTTP_RETRIES, settings.HTTP_RETRY_DELAY)(
+            self._http_client.send
+        )(request, auth=auth, stream=stream)
+        if not stream:
+            await response.read()
+
+        response = await self._handle_thing_with_pipelines(
+            response, self.response_pipelines
+        )
+        self.report(response)
+
+        return response
 
     async def collect(self, item: Item):
         self.logger.debug("Collect item: " + str(item))
@@ -115,7 +121,7 @@ class Ant(abc.ABC):
         ):
             await utils.run_cor_func(pipeline.on_spider_close)
 
-        await self.client.close()
+        await self._http_client.close()
 
         self._is_closed = True
         self.logger.info("Closed")
@@ -152,10 +158,7 @@ class Ant(abc.ABC):
             self._running_count -= 1
             self._done_queue.put_nowait(f)
             try:
-                if (
-                    self.concurrent_limit == -1
-                    or self._running_count < self.concurrent_limit
-                ):
+                if settings.JOB_LIMIT == -1 or self._running_count < settings.JOB_LIMIT:
                     next_coroutine = self._queue.get_nowait()
                     self._running_count += 1
                     asyncio.ensure_future(
@@ -168,7 +171,7 @@ class Ant(abc.ABC):
             self.logger.warning("This ant has be closed!")
             return
 
-        if self.concurrent_limit == -1 or self._running_count < self.concurrent_limit:
+        if settings.JOB_LIMIT == -1 or self._running_count < settings.JOB_LIMIT:
             self._running_count += 1
             asyncio.ensure_future(coroutine, loop=self.loop).add_done_callback(
                 _done_callback
@@ -188,18 +191,14 @@ class Ant(abc.ABC):
             await self._done_queue.get()
 
     def as_completed(
-        self,
-        coros: typing.Iterable[typing.Awaitable],
-        limit: typing.Optional[int] = None,
+        self, coros: typing.Iterable[typing.Awaitable], limit: int = settings.JOB_LIMIT,
     ) -> typing.Generator[typing.Awaitable, None, None]:
         """Like "asyncio.as_completed",
         run and iter coros out of pool.
 
-        :param limit: set to "self.concurrent_limit" by default,
+        :param limit: set to "settings.JOB_LIMIT" by default,
         this "limit" is not shared with pool`s limit
         """
-        limit = self.concurrent_limit if limit is None else limit
-
         coros = iter(coros)
         queue: Queue = Queue(loop=self.loop)
         todo: typing.List[asyncio.Future] = []
@@ -234,7 +233,7 @@ class Ant(abc.ABC):
     async def as_completed_with_async(
         self,
         coros: typing.Iterable[typing.Awaitable],
-        limit: typing.Optional[int] = None,
+        limit: int = settings.JOB_LIMIT,
         raise_exception: bool = True,
     ) -> typing.AsyncGenerator[typing.Any, None]:
         """as_completed`s async version, can catch and log exception inside.
@@ -292,30 +291,6 @@ class Ant(abc.ABC):
                     self.report(raw_thing, dropped=True)
                 raise e
         return thing
-
-    async def _send(
-        self,
-        req: httpx.Request,
-        *,
-        auth: httpx.models.AuthTypes,
-        timeout: float,
-        stream: bool,
-    ) -> httpx.Response:
-        self.report(req)
-
-        response: httpx.Response = await self.client.send(
-            req, auth=auth, timeout=timeout, stream=stream
-        )
-
-        if not stream:
-            await response.read()
-
-        response = await self._handle_thing_with_pipelines(
-            response, self.response_pipelines
-        )
-        self.report(response)
-
-        return response
 
 
 class CliAnt(Ant):
