@@ -1,6 +1,3 @@
-import sys
-import os
-from unittest import mock
 import re
 
 import httpx
@@ -8,8 +5,6 @@ import pytest
 import jpath
 from lxml import html
 
-from ant_nest.ant import CliAnt
-from ant_nest.cli import get_ants
 from ant_nest.things import (
     ItemExtractor,
     set_value_to_item,
@@ -17,7 +12,6 @@ from ant_nest.things import (
     ItemNestExtractor,
 )
 from ant_nest.exceptions import ThingDropped, ItemGetValueError, ExceptionFilter
-from ant_nest import cli
 
 
 def test_set_get_item():
@@ -76,62 +70,6 @@ def test_extract_item():
         assert item.xpath_key == str(temp)
         assert item.regex_key == str(temp)
         temp += 1
-
-
-def test_cli_get_ants():
-    ants = get_ants(["ant_nest", "tests"])
-    assert CliAnt is list(ants.values())[0]
-
-
-def test_cli_shutdown():
-    ant = CliAnt()
-    ant._queue.put_nowait(object())
-    cli.shutdown_ant([ant])
-    assert ant._is_closed
-    assert ant._queue.qsize() == 0
-
-    with pytest.raises(SystemExit):
-        cli.shutdown_ant([ant])
-
-
-def test_cli():
-    httpbin_base_url = os.getenv("TEST_HTTPBIN", "http://localhost:8080/")
-
-    with pytest.raises(SystemExit):
-        cli.main(["-v"])
-
-    with pytest.raises(SystemExit):  # no settings.py
-        cli.main(["-l"])
-
-    with pytest.raises(SystemExit), mock.patch("IPython.embed"):  # no settings.py
-        cli.main(["-u", httpbin_base_url])
-
-    from ant_nest import _settings_example as settings
-
-    # mock settings.py import
-    sys.modules["settings"] = settings
-
-    settings.ANT_PACKAGES = ["NoAnts"]
-    with pytest.raises(ModuleNotFoundError):  # can`t import NoAnts
-        cli.main(["-l"])
-
-    settings.ANT_PACKAGES = ["ant_nest.things"]
-    with pytest.raises(SystemExit):  # no ants can be found
-        cli.main(["-l"])
-
-    settings.ANT_PACKAGES = ["tests"]
-    cli.main(["-l"])
-
-    with pytest.raises(SystemExit):  # FakeAnt not exist
-        cli.main(["-a" "FakeAnt"])
-        cli.main(["-l"])
-
-    with pytest.raises(SystemExit), mock.patch("os.mkdir", lambda x: None), mock.patch(
-        "shutil.copyfile", lambda *args: None
-    ):
-        cli.main(["-c" "."])
-
-    cli.main(["-a" "tests.test_things.CliAnt"])
 
 
 def test_exception_filter():

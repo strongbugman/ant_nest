@@ -1,4 +1,4 @@
-"""Provide Ant`s Request, Response, Item and Extractor."""
+"""Provide Ant`s Item and Extractor."""
 import typing
 from collections.abc import MutableMapping
 

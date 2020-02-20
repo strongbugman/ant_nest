@@ -43,5 +43,5 @@ class GithubAnt(Ant):
         ):
             urls.add(response.url.join(node["href"]))
         for url in urls:
-            self.schedule_task(self.crawl_repo(url))
+            self.pool.spawn(self.crawl_repo(url))
         self.logger.info("Waiting...")

@@ -10,7 +10,6 @@ from importlib import import_module
 from pkgutil import iter_modules
 import signal
 import functools
-from asyncio.queues import QueueEmpty
 import fnmatch
 
 import IPython
@@ -61,14 +60,9 @@ def shutdown_ant(ants: typing.List[Ant]):
 
     print("Graceful shutdown {:s}...Try again to force " "shutdown".format(ant_names))
 
-    # drop waiting coroutines
+    # close coroutine pool
     for ant in ants:
-        ant._is_closed = True
-        while True:
-            try:
-                ant._queue.get_nowait()
-            except QueueEmpty:
-                break
+        ant.pool.close()
 
 
 def main(args=None):

@@ -7,7 +7,6 @@ import httpx
 from ant_nest.pipelines import Pipeline
 from ant_nest.ant import CliAnt, Ant
 from ant_nest.exceptions import ThingDropped
-from ant_nest import _settings_example as settings
 
 
 @pytest.mark.asyncio
@@ -101,7 +100,7 @@ async def test_ant_report(mocker):
         return httpx.Response(200, content=b"")
 
     ant = FakeAnt()
-    mocker.patch.object(ant._http_client, "send", new=send)
+    mocker.patch.object(ant.client, "send", new=send)
     # request report
     await ant.request("http://test.com")
     assert ant._reports["Request"][1] == 1
@@ -138,132 +137,6 @@ async def test_with_real_send():
 
 
 @pytest.mark.asyncio
-async def test_schedule_task():
-    count = 0
-    max_count = 10
-
-    async def cor():
-        nonlocal count
-        count += 1
-
-    ant = CliAnt()
-
-    ant.schedule_tasks((cor() for i in range(max_count)))
-    await ant.wait_scheduled_tasks()
-    assert count == max_count
-    # test with limit
-    count = 0
-    running_count = 0
-    max_running_count = -1
-    concurrent_limit = 3
-
-    async def cor():
-        nonlocal count, running_count, max_running_count
-        running_count += 1
-        max_running_count = max(running_count, max_running_count)
-        await asyncio.sleep(0.1)
-        count += 1
-        running_count -= 1
-
-    settings.JOB_LIMIT = concurrent_limit
-    ant.schedule_tasks(cor() for i in range(max_count))
-    assert ant.is_running
-    await ant.wait_scheduled_tasks()
-    assert count == max_count
-    assert max_running_count <= concurrent_limit
-    # test with exception
-    count = 0
-    max_count = 3
-
-    async def coro():
-        nonlocal count
-        count += 1
-        raise Exception("Test exception")
-
-    ant.schedule_tasks(coro() for i in range(max_count))
-    await ant.wait_scheduled_tasks()
-    assert count == max_count
-
-    # test with closed ant
-    await ant.close()
-
-    x = coro()
-    ant.schedule_task(x)  # this coroutine will not be running
-    await ant.close()
-    assert count == max_count
-    with pytest.raises(Exception):
-        await x
-
-
-@pytest.mark.asyncio
-async def test_as_completed():
-    ant = CliAnt(loop=asyncio.get_event_loop())
-    count = 3
-
-    async def cor(i):
-        return i
-
-    right_result = 0
-    for c in ant.as_completed((cor(i) for i in range(count)), limit=-1):
-        await c
-        right_result += 1
-    assert right_result == count
-
-    async def cor(i):
-        await asyncio.sleep(i * 0.1)
-        return i
-
-    right_result = 0  # 0, 1, 2
-    for c in ant.as_completed((cor(i) for i in reversed(range(count)))):
-        result = await c
-        assert result == right_result
-        right_result += 1
-    assert right_result == count
-    # with limit
-    right_result = 2  # 2, 1, 0
-    for c in ant.as_completed((cor(i) for i in reversed(range(count))), limit=1):
-        result = await c
-        assert result == right_result
-        right_result -= 1
-    assert right_result == -1
-
-    await ant.close()
-
-
-@pytest.mark.asyncio
-async def test_as_completed_with_async():
-
-    ant = CliAnt()
-
-    async def cor(x):
-        if x < 0:
-            raise Exception("Test exception")
-        return x
-
-    result_sum = 0
-    async for result in ant.as_completed_with_async((cor(i) for i in range(5))):
-        result_sum += result
-    assert result_sum == sum(range(5))
-
-    result_sum = 0
-    async for result in ant.as_completed_with_async(
-        (cor(i - 2) for i in range(5)), raise_exception=False
-    ):
-        result_sum += result
-    assert result_sum == sum(range(3))
-
-    async for _ in ant.as_completed_with_async([cor(-1)], raise_exception=False):
-        assert _
-        raise Exception("This loop should not be entered!")
-
-    with pytest.raises(Exception):
-        async for _ in ant.as_completed_with_async([cor(-1)]):
-            assert _
-
-    await ant.close()
-
-
-@pytest.mark.asyncio
 async def test_ant_main():
     """Pipeline closed before scheduled coroutines done?"""
 
@@ -279,7 +152,7 @@ async def test_ant_main():
         in_error = False
 
         async def run(self):
-            self.schedule_task(self.long_cor())
+            self.pool.spawn(self.long_cor())
 
         async def long_cor(self):
             await asyncio.sleep(1)

@@ -7,14 +7,13 @@ import itertools
 import logging
 import time
 from collections import defaultdict
-from asyncio.queues import Queue, QueueEmpty
-from itertools import islice
 
 import httpx
 
 from .pipelines import Pipeline
 from .things import Item
 from .exceptions import ThingDropped
+from .pool import Pool
 from . import utils
 
 pwd = os.getcwd()
@@ -35,12 +34,8 @@ class Ant(abc.ABC):
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None):
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._http_client = httpx.Client(**settings.HTTPX_CONFIG)
-        # background coroutine job config
-        self._queue: Queue = Queue(loop=self.loop)
-        self._done_queue: Queue = Queue(loop=self.loop)
-        self._running_count = 0
-        self._is_closed = False
+        self.client = httpx.Client(**settings.HTTPX_CONFIG)
+        self.pool = Pool(**settings.POOL_CONFIG)
         # report var
         self._reports: typing.DefaultDict[str, typing.List[int]] = defaultdict(
             lambda: [0, 0]
@@ -56,10 +51,6 @@ class Ant(abc.ABC):
     def name(self):
         return self.__class__.__name__
 
-    @property
-    def is_running(self) -> bool:
-        return self._running_count > 0
-
     async def request(
         self,
         url: str,
@@ -73,7 +64,7 @@ class Ant(abc.ABC):
         auth: httpx.models.AuthTypes = None,
         stream: bool = False,
     ) -> httpx.Response:
-        request: httpx.Request = self._http_client.build_request(
+        request: httpx.Request = self.client.build_request(
             method,
             url,
             params=params,
@@ -89,7 +80,7 @@ class Ant(abc.ABC):
         self.report(request)
 
         response = await utils.retry(settings.HTTP_RETRIES, settings.HTTP_RETRY_DELAY)(
-            self._http_client.send
+            self.client.send
         )(request, auth=auth, stream=stream)
         if not stream:
             await response.read()
@@ -114,16 +105,15 @@ class Ant(abc.ABC):
             await utils.run_cor_func(pipeline.on_spider_open)
 
     async def close(self):
-        await self.wait_scheduled_tasks()
+        await self.pool.wait_close()
 
         for pipeline in itertools.chain(
             self.item_pipelines, self.response_pipelines, self.request_pipelines
         ):
             await utils.run_cor_func(pipeline.on_spider_close)
 
-        await self._http_client.close()
+        await self.client.close()
 
-        self._is_closed = True
         self.logger.info("Closed")
 
     @abc.abstractmethod
@@ -146,109 +136,6 @@ class Ant(abc.ABC):
                 self.__class__.__name__, time.time() - self._start_time
             )
         )
-
-    def schedule_task(self, coroutine: typing.Awaitable):
-        """Like "asyncio.ensure_future", with concurrent count limit
-
-        Call "self.wait_scheduled_tasks" make sure all task has been
-        done.
-        """
-
-        def _done_callback(f):
-            self._running_count -= 1
-            self._done_queue.put_nowait(f)
-            try:
-                if settings.JOB_LIMIT == -1 or self._running_count < settings.JOB_LIMIT:
-                    next_coroutine = self._queue.get_nowait()
-                    self._running_count += 1
-                    asyncio.ensure_future(
-                        next_coroutine, loop=self.loop
-                    ).add_done_callback(_done_callback)
-            except QueueEmpty:
-                pass
-
-        if self._is_closed:
-            self.logger.warning("This ant has be closed!")
-            return
-
-        if settings.JOB_LIMIT == -1 or self._running_count < settings.JOB_LIMIT:
-            self._running_count += 1
-            asyncio.ensure_future(coroutine, loop=self.loop).add_done_callback(
-                _done_callback
-            )
-        else:
-            self._queue.put_nowait(coroutine)
-
-    def schedule_tasks(self, coros: typing.Iterable[typing.Awaitable]):
-        """A short way to schedule many tasks.
-        """
-        for coro in coros:
-            self.schedule_task(coro)
-
-    async def wait_scheduled_tasks(self):
-        """Wait scheduled tasks to be done"""
-        while self._running_count > 0 or self._done_queue.qsize() > 0:
-            await self._done_queue.get()
-
-    def as_completed(
-        self, coros: typing.Iterable[typing.Awaitable], limit: int = settings.JOB_LIMIT,
-    ) -> typing.Generator[typing.Awaitable, None, None]:
-        """Like "asyncio.as_completed",
-        run and iter coros out of pool.
-
-        :param limit: set to "settings.JOB_LIMIT" by default,
-        this "limit" is not shared with pool`s limit
-        """
-        coros = iter(coros)
-        queue: Queue = Queue(loop=self.loop)
-        todo: typing.List[asyncio.Future] = []
-
-        def _done_callback(f):
-            queue.put_nowait(f)
-            todo.remove(f)
-            try:
-                nf = asyncio.ensure_future(next(coros))
-                nf.add_done_callback(_done_callback)
-                todo.append(nf)
-            except StopIteration:
-                pass
-
-        async def _wait_for_one():
-            return (await queue.get()).result()
-
-        if limit <= 0:
-            fs = {asyncio.ensure_future(cor, loop=self.loop) for cor in coros}
-        else:
-            fs = {
-                asyncio.ensure_future(cor, loop=self.loop)
-                for cor in islice(coros, 0, limit)
-            }
-        for f in fs:
-            f.add_done_callback(_done_callback)
-            todo.append(f)
-
-        while len(todo) > 0 or queue.qsize() > 0:
-            yield _wait_for_one()
-
-    async def as_completed_with_async(
-        self,
-        coros: typing.Iterable[typing.Awaitable],
-        limit: int = settings.JOB_LIMIT,
-        raise_exception: bool = True,
-    ) -> typing.AsyncGenerator[typing.Any, None]:
-        """as_completed`s async version, can catch and log exception inside.
-        """
-        for coro in self.as_completed(coros, limit=limit):
-            try:
-                yield await coro
-            except Exception as e:
-                if raise_exception:
-                    raise e
-                else:
-                    self.logger.exception(
-                        "Get exception {:s} in "
-                        '"as_completed_with_async"'.format(str(e))
-                    )
 
     def report(self, thing: typing.Any, dropped: bool = False):
         now_time = time.time()

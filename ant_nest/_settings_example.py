@@ -26,8 +26,12 @@ HTTPX_CONFIG = {
 }
 
 
+POOL_CONFIG = {
+    "limit": 100,
+}
+
+
 # ANT config
-JOB_LIMIT = 50
 HTTP_RETRIES = 0
 HTTP_RETRY_DELAY = 0.1
 
