@@ -29,6 +29,9 @@ HTTPX_CONFIG = {
 POOL_CONFIG = {
     "limit": 100,
 }
+REPORTER = {
+    "slot": 60,
+}
 
 
 # ANT config

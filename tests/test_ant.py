@@ -6,7 +6,6 @@ import httpx
 
 from ant_nest.pipelines import Pipeline
 from ant_nest.ant import CliAnt, Ant
-from ant_nest.exceptions import ThingDropped
 
 
 @pytest.mark.asyncio
@@ -80,35 +79,6 @@ async def test_pipelines():
         await ant.open()
     with pytest.raises(TypeError):
         await ant.close()
-
-
-@pytest.mark.asyncio
-async def test_ant_report(mocker):
-    class FakePipeline(Pipeline):
-        def process(self, thing):
-            if thing.url.host == "error":
-                raise ThingDropped
-            return thing
-
-    class FakeAnt(Ant):
-        request_pipelines = [FakePipeline()]
-
-        async def run(self):
-            pass
-
-    async def send(*args, **kwargs):
-        return httpx.Response(200, content=b"")
-
-    ant = FakeAnt()
-    mocker.patch.object(ant.client, "send", new=send)
-    # request report
-    await ant.request("http://test.com")
-    assert ant._reports["Request"][1] == 1
-    assert ant._reports["Request"][0] == 0
-    with pytest.raises(ThingDropped):
-        await ant.request("http://error")
-    assert ant._drop_reports["Request"][1] == 1
-    await ant.main()
 
 
 @pytest.mark.asyncio

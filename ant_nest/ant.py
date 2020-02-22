@@ -6,7 +6,6 @@ import abc
 import itertools
 import logging
 import time
-from collections import defaultdict
 
 import httpx
 
@@ -14,6 +13,7 @@ from .pipelines import Pipeline
 from .things import Item
 from .exceptions import ThingDropped
 from .pool import Pool
+from .reporter import Reporter
 from . import utils
 
 pwd = os.getcwd()
@@ -32,20 +32,12 @@ class Ant(abc.ABC):
     item_pipelines: typing.List[Pipeline] = []
 
     def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None):
+        self._start_time = time.time()
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = httpx.Client(**settings.HTTPX_CONFIG)
         self.pool = Pool(**settings.POOL_CONFIG)
-        # report var
-        self._reports: typing.DefaultDict[str, typing.List[int]] = defaultdict(
-            lambda: [0, 0]
-        )
-        self._drop_reports: typing.DefaultDict[str, typing.List[int]] = defaultdict(
-            lambda: [0, 0]
-        )
-        self._start_time = time.time()
-        self._last_time = self._start_time
-        self._report_slot = 60  # report once after one minute by default
+        self.reporter = Reporter(**settings.REPORTER)
 
     @property
     def name(self):
@@ -77,7 +69,7 @@ class Ant(abc.ABC):
         request = await self._handle_thing_with_pipelines(
             request, self.request_pipelines
         )
-        self.report(request)
+        self.reporter.report(request)
 
         response = await utils.retry(settings.HTTP_RETRIES, settings.HTTP_RETRY_DELAY)(
             self.client.send
@@ -88,14 +80,14 @@ class Ant(abc.ABC):
         response = await self._handle_thing_with_pipelines(
             response, self.response_pipelines
         )
-        self.report(response)
+        self.reporter.report(response)
 
         return response
 
     async def collect(self, item: Item):
         self.logger.debug("Collect item: " + str(item))
         await self._handle_thing_with_pipelines(item, self.item_pipelines)
-        self.report(item)
+        self.reporter.report(item)
 
     async def open(self):
         self.logger.info("Opening")
@@ -114,6 +106,8 @@ class Ant(abc.ABC):
 
         await self.client.close()
 
+        self.reporter.close()
+
         self.logger.info("Closed")
 
     @abc.abstractmethod
@@ -126,44 +120,11 @@ class Ant(abc.ABC):
             await self.run()
         with utils.suppress(self.logger):
             await self.close()
-        # total report
-        for name, counts in self._reports.items():
-            self.logger.info("Get {:d} {:s} in total".format(counts[1], name))
-        for name, counts in self._drop_reports.items():
-            self.logger.info("Drop {:d} {:s} in total".format(counts[1], name))
         self.logger.info(
             "Run {:s} in {:f} seconds".format(
                 self.__class__.__name__, time.time() - self._start_time
             )
         )
-
-    def report(self, thing: typing.Any, dropped: bool = False):
-        now_time = time.time()
-        if now_time - self._last_time > self._report_slot:
-            self._last_time = now_time
-            for name, counts in self._reports.items():
-                count = counts[1] - counts[0]
-                counts[0] = counts[1]
-                self.logger.info(
-                    "Get {:d} {:s} in total with {:d}/{:d}s rate".format(
-                        counts[1], name, count, self._report_slot
-                    )
-                )
-            for name, counts in self._drop_reports.items():
-                count = counts[1] - counts[0]
-                counts[0] = counts[1]
-                self.logger.info(
-                    "Drop {:d} {:s} in total with {:d}/{:d} rate".format(
-                        counts[1], name, count, self._report_slot
-                    )
-                )
-        report_type = thing.__class__.__name__
-        if dropped:
-            reports = self._drop_reports
-        else:
-            reports = self._reports
-        counts = reports[report_type]
-        counts[1] += 1
 
     async def _handle_thing_with_pipelines(
         self, thing: typing.Any, pipelines: typing.List[Pipeline]
@@ -175,7 +136,7 @@ class Ant(abc.ABC):
                 thing = await utils.run_cor_func(pipeline.process, thing)
             except Exception as e:
                 if isinstance(e, ThingDropped):
-                    self.report(raw_thing, dropped=True)
+                    self.reporter.report(raw_thing, dropped=True)
                 raise e
         return thing
 
