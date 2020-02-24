@@ -35,7 +35,9 @@ async def test_ant():
             assert self.item_pipelines[0].count == 1
 
         async def requset(self, *args, **kwargs):
-            return httpx.Response(200, content=b"")
+            return httpx.Response(
+                200, request=httpx.Request("Get", "https://test.com"), content=b""
+            )
 
     ant = TestAnt()
     assert ant.name == "TestAnt"

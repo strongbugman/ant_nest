@@ -17,8 +17,12 @@ async def test_pipeline():
 
 def test_response_filter_error_pipeline():
     pl = pls.ResponseFilterErrorPipeline()
-    res = httpx.Response(200, content=b"")
-    err_res = httpx.Response(403, content=b"")
+    res = httpx.Response(
+        200, request=httpx.Request("Get", "https://test.com"), content=b""
+    )
+    err_res = httpx.Response(
+        403, request=httpx.Request("Get", "https://test.com"), content=b""
+    )
     assert res is pl.process(res)
     with pytest.raises(ThingDropped):
         pl.process(err_res)

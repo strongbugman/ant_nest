@@ -35,7 +35,7 @@ class Ant(abc.ABC):
         self._start_time = time.time()
         self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.client = httpx.Client(**settings.HTTPX_CONFIG)
+        self.client = httpx.AsyncClient(**settings.HTTPX_CONFIG)
         self.pool = Pool(**settings.POOL_CONFIG)
         self.reporter = Reporter(**settings.REPORTER)
 
@@ -53,7 +53,7 @@ class Ant(abc.ABC):
         params: httpx.models.QueryParamTypes = None,
         headers: httpx.models.HeaderTypes = None,
         cookies: httpx.models.CookieTypes = None,
-        auth: httpx.models.AuthTypes = None,
+        auth: httpx.auth.AuthTypes = None,
         stream: bool = False,
     ) -> httpx.Response:
         request: httpx.Request = self.client.build_request(
@@ -74,8 +74,6 @@ class Ant(abc.ABC):
         response = await utils.retry(settings.HTTP_RETRIES, settings.HTTP_RETRY_DELAY)(
             self.client.send
         )(request, auth=auth, stream=stream)
-        if not stream:
-            await response.read()
 
         response = await self._handle_thing_with_pipelines(
             response, self.response_pipelines
@@ -104,7 +102,7 @@ class Ant(abc.ABC):
         ):
             await utils.run_cor_func(pipeline.on_spider_close)
 
-        await self.client.close()
+        await self.client.aclose()
 
         self.reporter.close()
 

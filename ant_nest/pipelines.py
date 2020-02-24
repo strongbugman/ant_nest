@@ -8,7 +8,7 @@ import re
 
 import aiofiles
 from httpx import Request, Response
-from httpx.config import USER_AGENT
+from httpx.models import USER_AGENT
 
 from .things import Item, set_value_to_item, get_value_from_item
 from .exceptions import ThingDropped

@@ -27,7 +27,9 @@ def test_set_get_item():
 
 def test_extract_item():
     with open("./tests/test.html", "rb") as f:
-        response = httpx.Response(200, content=f.read())
+        response = httpx.Response(
+            200, request=httpx.Request("Get", "https://test.com"), content=f.read()
+        )
 
     class Item:
         pass
@@ -45,7 +47,11 @@ def test_extract_item():
     assert item.paragraph == "test"
     assert item.title == "Test html"
     # extract with jpath
-    response = httpx.Response(200, content=b'{"a": {"b": {"c": 1}}, "d": null}')
+    response = httpx.Response(
+        200,
+        request=httpx.Request("Get", "https://test.com"),
+        content=b'{"a": {"b": {"c": 1}}, "d": null}',
+    )
     item_extractor = ItemExtractor(Item)
     item_extractor.add_extractor(
         "author", lambda x: jpath.get_all("a.b.c", x.json())[0]
@@ -56,7 +62,9 @@ def test_extract_item():
     assert item.freedom is None
     # ItemNestExtractor tests
     with open("./tests/test.html", "rb") as f:
-        response = httpx.Response(200, content=f.read())
+        response = httpx.Response(
+            200, request=httpx.Request("Get", "https://test.com"), content=f.read()
+        )
     item_nest_extractor = ItemNestExtractor(
         Item, lambda x: html.fromstring(x.text).xpath('//div[@id="nest"]/div')
     )

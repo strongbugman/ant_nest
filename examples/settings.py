@@ -17,7 +17,6 @@ HTTPX_CONFIG = {
     "max_redirects": httpx.config.DEFAULT_MAX_REDIRECTS,
     "pool_limits": httpx.config.DEFAULT_POOL_LIMITS,
     "trust_env": True,
-    "http2": False,
     "proxies": None,
     "auth": None,
     "headers": None,
