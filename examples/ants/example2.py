@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 from lxml import html
 from ant_nest.ant import Ant
 from ant_nest.pipelines import ItemFieldReplacePipeline
-from ant_nest.things import ItemExtractor
+from ant_nest.items import Extractor
 
 
 class GithubAnt(Ant):
@@ -17,7 +17,7 @@ class GithubAnt(Ant):
 
     def __init__(self):
         super().__init__()
-        self.item_extractor = ItemExtractor(dict)
+        self.item_extractor = Extractor(dict)
         self.item_extractor.add_extractor(
             "title", lambda x: html.fromstring(x.text).xpath("//h1/strong/a/text()")[0],
         )

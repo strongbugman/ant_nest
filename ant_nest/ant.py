@@ -10,8 +10,8 @@ import time
 import httpx
 
 from .pipelines import Pipeline
-from .things import Item
-from .exceptions import ThingDropped
+from .items import Item
+from .exceptions import Dropped
 from .pool import Pool
 from .reporter import Reporter
 from . import utils
@@ -66,25 +66,21 @@ class Ant(abc.ABC):
             files=files,
             json=json,
         )
-        request = await self._handle_thing_with_pipelines(
-            request, self.request_pipelines
-        )
+        request = await self._pipe(request, self.request_pipelines)
         self.reporter.report(request)
 
         response = await utils.retry(settings.HTTP_RETRIES, settings.HTTP_RETRY_DELAY)(
             self.client.send
         )(request, auth=auth, stream=stream)
 
-        response = await self._handle_thing_with_pipelines(
-            response, self.response_pipelines
-        )
+        response = await self._pipe(response, self.response_pipelines)
         self.reporter.report(response)
 
         return response
 
     async def collect(self, item: Item):
         self.logger.debug("Collect item: " + str(item))
-        await self._handle_thing_with_pipelines(item, self.item_pipelines)
+        await self._pipe(item, self.item_pipelines)
         self.reporter.report(item)
 
     async def open(self):
@@ -124,19 +120,21 @@ class Ant(abc.ABC):
             )
         )
 
-    async def _handle_thing_with_pipelines(
-        self, thing: typing.Any, pipelines: typing.List[Pipeline]
+    async def _pipe(
+        self,
+        obj: typing.Union[Item, httpx.Request, httpx.Response],
+        pipelines: typing.List[Pipeline],
     ) -> typing.Any:
-        self.logger.debug("Process thing: " + str(thing))
-        raw_thing = thing
+        self.logger.debug("Process obj: " + str(obj))
+        raw_obj = obj
         for pipeline in pipelines:
             try:
-                thing = await utils.run_cor_func(pipeline.process, thing)
+                obj = await utils.run_cor_func(pipeline.process, obj)
             except Exception as e:
-                if isinstance(e, ThingDropped):
-                    self.reporter.report(raw_thing, dropped=True)
+                if isinstance(e, Dropped):
+                    self.reporter.report(raw_obj, dropped=True)
                 raise e
-        return thing
+        return obj
 
 
 class CliAnt(Ant):

@@ -6,7 +6,7 @@ import httpx
 import aiofiles
 
 from ant_nest import pipelines as pls
-from ant_nest.exceptions import ThingDropped
+from ant_nest.exceptions import Dropped
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ def test_response_filter_error_pipeline():
         403, request=httpx.Request("Get", "https://test.com"), content=b""
     )
     assert res is pl.process(res)
-    with pytest.raises(ThingDropped):
+    with pytest.raises(Dropped):
         pl.process(err_res)
 
 
@@ -32,7 +32,7 @@ def test_request_duplicate_filter_pipeline():
     pl = pls.RequestDuplicateFilterPipeline()
     req = httpx.Request("GET", "http://test.com")
     assert pl.process(req) is req
-    with pytest.raises(ThingDropped):
+    with pytest.raises(Dropped):
         pl.process(req)
 
 

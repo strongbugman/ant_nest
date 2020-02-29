@@ -10,8 +10,8 @@ import aiofiles
 from httpx import Request, Response
 from httpx.models import USER_AGENT
 
-from .things import Item, set_value_to_item, get_value_from_item
-from .exceptions import ThingDropped
+from .items import Item, set_value, get_value
+from .exceptions import Dropped
 from .utils import run_cor_func
 
 
@@ -25,22 +25,22 @@ class Pipeline:
     def on_spider_close(self) -> typing.Optional[typing.Awaitable]:
         """Call when ant close, this method can be coroutine function"""
 
-    def process(self, thing: typing.Any) -> typing.Any:
-        """Process things, this method can be coroutine function
-        Raise ThingDropped when drop one thing
+    def process(self, obj: typing.Any) -> typing.Any:
+        """Process objs, this method can be coroutine function
+        Raise Dropped when drop one obj
 
-        :raise ThingDropped
+        :raise Dropped
         """
-        return thing
+        return obj
 
 
 # Response pipelines
 class ResponseFilterErrorPipeline(Pipeline):
-    def process(self, thing: Response) -> Response:
-        if thing.status_code >= 400:
-            raise ThingDropped("Response - {:s}".format(str(thing)))
+    def process(self, obj: Response) -> Response:
+        if obj.status_code >= 400:
+            raise Dropped("Response - {:s}".format(str(obj)))
         else:
-            return thing
+            return obj
 
 
 # Request pipelines
@@ -49,12 +49,12 @@ class RequestDuplicateFilterPipeline(Pipeline):
         self.__request_urls = set()
         super().__init__()
 
-    def process(self, thing: Request) -> Request:
-        if thing.url in self.__request_urls:
-            raise ThingDropped("Request duplicate!")
+    def process(self, obj: Request) -> Request:
+        if obj.url in self.__request_urls:
+            raise Dropped("Request duplicate!")
         else:
-            self.__request_urls.add(thing.url)
-            return thing
+            self.__request_urls.add(obj.url)
+            return obj
 
 
 class RequestUserAgentPipeline(Pipeline):
@@ -67,10 +67,10 @@ class RequestUserAgentPipeline(Pipeline):
         super().__init__()
         self.user_agent = user_agent
 
-    def process(self, thing: Request) -> Request:
-        if thing.headers.get("user-agent") == USER_AGENT:
-            thing.headers["user-agent"] = self.user_agent
-        return thing
+    def process(self, obj: Request) -> Request:
+        if obj.headers.get("user-agent") == USER_AGENT:
+            obj.headers["user-agent"] = self.user_agent
+        return obj
 
 
 class RequestRandomUserAgentPipeline(Pipeline):
@@ -163,10 +163,10 @@ class RequestRandomUserAgentPipeline(Pipeline):
             system=self._format(system_format), browser=self._format(browser_format)
         )
 
-    def process(self, thing: Request) -> Request:
-        if thing.headers.get("user-agent") == USER_AGENT:
-            thing.headers["user-agent"] = self.create()
-        return thing
+    def process(self, obj: Request) -> Request:
+        if obj.headers.get("user-agent") == USER_AGENT:
+            obj.headers["user-agent"] = self.create()
+        return obj
 
 
 class RequestRandomComputerUserAgentPipeline(Pipeline):
@@ -186,9 +186,9 @@ class RequestRandomMobileUserAgentPipeline(Pipeline):
 
 # Item pipelines
 class ItemPrintPipeline(Pipeline):
-    def process(self, thing: Item) -> Item:
-        self.logger.info(thing.__repr__())
-        return thing
+    def process(self, obj: Item) -> Item:
+        self.logger.info(obj.__repr__())
+        return obj
 
 
 class ItemFieldReplacePipeline(Pipeline):
@@ -203,13 +203,13 @@ class ItemFieldReplacePipeline(Pipeline):
         self.excess_chars = excess_chars
         super().__init__()
 
-    def process(self, thing: Item) -> Item:
+    def process(self, obj: Item) -> Item:
         for field in self.fields:
-            value: str = get_value_from_item(thing, field)
+            value: str = get_value(obj, field)
             for char in self.excess_chars:
                 value = value.replace(char, "")
-            set_value_to_item(thing, field, value)
-        return thing
+            set_value(obj, field, value)
+        return obj
 
 
 class ItemBaseFileDumpPipeline(Pipeline):
@@ -264,9 +264,9 @@ class ItemJsonDumpPipeline(ItemBaseFileDumpPipeline):
         self.data: typing.DefaultDict[str, typing.List[typing.Dict]] = defaultdict(list)
         self.to_dict = to_dict
 
-    def process(self, thing: Item) -> Item:
-        self.data[thing.__class__.__name__].append(self.to_dict(thing))
-        return thing
+    def process(self, obj: Item) -> Item:
+        self.data[obj.__class__.__name__].append(self.to_dict(obj))
+        return obj
 
     async def on_spider_close(self):
         for file_name, data in self.data.items():

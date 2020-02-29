@@ -5,13 +5,13 @@ import pytest
 import jpath
 from lxml import html
 
-from ant_nest.things import (
-    ItemExtractor,
-    set_value_to_item,
-    get_value_from_item,
-    ItemNestExtractor,
+from ant_nest.items import (
+    Extractor,
+    set_value,
+    get_value,
+    NestExtractor,
 )
-from ant_nest.exceptions import ThingDropped, ItemGetValueError, ExceptionFilter
+from ant_nest.exceptions import Dropped, ItemGetValueError, ExceptionFilter
 
 
 def test_set_get_item():
@@ -19,10 +19,10 @@ def test_set_get_item():
         pass
 
     for item in (dict(), ClsItem()):
-        set_value_to_item(item, "name", "test")
-        assert get_value_from_item(item, "name") == "test"
+        set_value(item, "name", "test")
+        assert get_value(item, "name") == "test"
         with pytest.raises(ItemGetValueError):
-            get_value_from_item(item, "name2")
+            get_value(item, "name2")
 
 
 def test_extract_item():
@@ -35,7 +35,7 @@ def test_extract_item():
         pass
 
     # extract item with xpath and regex
-    item_extractor = ItemExtractor(Item)
+    item_extractor = Extractor(Item)
     item_extractor.add_extractor(
         "paragraph",
         lambda x: html.fromstring(x.text).xpath("/html/body/div/p/text()")[0],
@@ -52,7 +52,7 @@ def test_extract_item():
         request=httpx.Request("Get", "https://test.com"),
         content=b'{"a": {"b": {"c": 1}}, "d": null}',
     )
-    item_extractor = ItemExtractor(Item)
+    item_extractor = Extractor(Item)
     item_extractor.add_extractor(
         "author", lambda x: jpath.get_all("a.b.c", x.json())[0]
     )
@@ -65,7 +65,7 @@ def test_extract_item():
         response = httpx.Response(
             200, request=httpx.Request("Get", "https://test.com"), content=f.read()
         )
-    item_nest_extractor = ItemNestExtractor(
+    item_nest_extractor = NestExtractor(
         Item, lambda x: html.fromstring(x.text).xpath('//div[@id="nest"]/div')
     )
     item_nest_extractor.add_extractor("xpath_key", lambda x: x.xpath("./p/text()")[0])
@@ -86,7 +86,7 @@ def test_exception_filter():
 
     fr = ExceptionFilter()
     rc = FakeRecord()
-    rc.exc_info = (ThingDropped, None, None)
+    rc.exc_info = (Dropped, None, None)
 
     assert not fr.filter(rc)
     rc.exc_info = (OSError, None, None)

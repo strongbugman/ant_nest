@@ -2,11 +2,11 @@ import logging
 import typing
 
 
-__all__ = ["ThingDropped", "ItemGetValueError", "ExceptionFilter"]
+__all__ = ["Dropped", "ItemGetValueError", "ExceptionFilter"]
 
 
-class ThingDropped(Exception):
-    """Raise when pipeline dropped one thing"""
+class Dropped(Exception):
+    """Raise when pipeline dropped one object"""
 
 
 class ItemGetValueError(Exception):
@@ -19,7 +19,7 @@ class ExceptionFilter(logging.Filter):
 
     def __init__(
         self,
-        exceptions: typing.Sequence[typing.Type[Exception]] = (ThingDropped,),
+        exceptions: typing.Sequence[typing.Type[Exception]] = (Dropped,),
         *args,
         **kwargs
     ):

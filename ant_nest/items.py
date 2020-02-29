@@ -17,14 +17,14 @@ class CustomNoneType:
 Item = typing.TypeVar("Item")
 
 
-def set_value_to_item(item: Item, key: str, value: typing.Any):
+def set_value(item: Item, key: str, value: typing.Any):
     if isinstance(item, MutableMapping):
         item[key] = value
     else:
         setattr(item, key, value)
 
 
-def get_value_from_item(item: Item, key: str) -> typing.Any:
+def get_value(item: Item, key: str) -> typing.Any:
     try:
         if isinstance(item, MutableMapping):
             return item[key]
@@ -34,7 +34,7 @@ def get_value_from_item(item: Item, key: str) -> typing.Any:
         raise ItemGetValueError from e
 
 
-class ItemExtractor:
+class Extractor:
     def __init__(self, item_cls: typing.Type[Item]):
         self.item_cls = item_cls
         self.extractors: typing.Dict[
@@ -49,12 +49,12 @@ class ItemExtractor:
     def extract(self, res: httpx.Response) -> Item:
         item = self.item_cls()
         for key, extractor in self.extractors.items():
-            set_value_to_item(item, key, extractor(res))
+            set_value(item, key, extractor(res))
 
         return item
 
 
-class ItemNestExtractor(ItemExtractor):
+class NestExtractor(Extractor):
     def __init__(
         self,
         item_class: typing.Type[Item],
@@ -70,8 +70,8 @@ class ItemNestExtractor(ItemExtractor):
 
 __all__ = [
     "Item",
-    "ItemExtractor",
-    "ItemNestExtractor",
-    "get_value_from_item",
-    "set_value_to_item",
+    "Extractor",
+    "NestExtractor",
+    "get_value",
+    "set_value",
 ]

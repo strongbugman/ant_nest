@@ -44,7 +44,7 @@ def test_cli():
     with pytest.raises(ModuleNotFoundError):  # can`t import NoAnts
         cli.main(["-l"])
 
-    settings.ANT_PACKAGES = ["ant_nest.things"]
+    settings.ANT_PACKAGES = ["ant_nest.items"]
     with pytest.raises(SystemExit):  # no ants can be found
         cli.main(["-l"])
 

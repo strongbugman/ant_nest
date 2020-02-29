@@ -21,9 +21,9 @@ async def test_ant():
         async def on_spider_close(self):
             raise Exception("This exception will be suppressed")
 
-        def process(self, thing):
+        def process(self, obj):
             self.count += 1
-            return thing
+            return obj
 
     class TestAnt(Ant):
         item_pipelines = [TestPipeline()]
@@ -53,7 +53,7 @@ async def test_ant():
 @pytest.mark.asyncio
 async def test_pipelines():
     class TestPipeline(Pipeline):
-        async def process(self, thing):
+        async def process(self, obj):
             raise TypeError("Test error")
 
         def on_spider_open(self):
@@ -69,13 +69,13 @@ async def test_pipelines():
             return None
 
     pls = [Pipeline() for x in range(10)]
-    thing = object()
+    obj = object()
     ant = TestAnt()
-    assert thing is await ant._handle_thing_with_pipelines(thing, pls)
+    assert obj is await ant._pipe(obj, pls)
     # with exception
     pls[5] = TestPipeline()
     with pytest.raises(TypeError):
-        await ant._handle_thing_with_pipelines(thing, pls)
+        await ant._pipe(obj, pls)
     # exception will be ignored in "open" and "close" method
     with pytest.raises(TypeError):
         await ant.open()

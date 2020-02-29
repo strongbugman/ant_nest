@@ -21,9 +21,9 @@ Features
 ========
 
 * Useful http client out of box
-* Easy things(request, response and item) pipelines(in async or not)
-* Easy Item extractor, define data detail(by xpath, jpath or regex) and extract from html, json or strings.
-* Easy work flow
+* Easy pipelines, in async or not
+* Easy item extractor, define data detail(by xpath, jpath or regex) and extract from html, json or strings.
+* Easy async work flow, build in async task pool
 
 Install
 =======
@@ -48,7 +48,7 @@ Presume we want to get hot repos from github, let`s create "examples/ants/exampl
     from yarl import URL
     from ant_nest.ant import Ant
     from ant_nest.pipelines import ItemFieldReplacePipeline
-    from ant_nest.things import ItemExtractor
+    from ant_nest.items import Extractor
 
 
     class GithubAnt(Ant):
@@ -59,11 +59,10 @@ Presume we want to get hot repos from github, let`s create "examples/ants/exampl
                 ("meta_content", "star", "fork"), excess_chars=("\r", "\n", "\t", "  ")
             )
         ]
-        concurrent_limit = 1  # save the website`s and your bandwidth!
 
         def __init__(self):
             super().__init__()
-            self.item_extractor = ItemExtractor(dict)
+            self.item_extractor = Extractor(dict)
             self.item_extractor.add_extractor(
                 "title", lambda x: x.html_element.xpath("//h1/strong/a/text()")[0]
             )
