@@ -14,9 +14,9 @@ ANT_ENV = os.getenv("ANT_ENV", "development")
 
 # httpx config, see httpx.Client.__init__ for more detail
 HTTPX_CONFIG = {
-    "timeout": httpx.config.DEFAULT_TIMEOUT_CONFIG,
-    "max_redirects": httpx.config.DEFAULT_MAX_REDIRECTS,
-    "pool_limits": httpx.config.DEFAULT_POOL_LIMITS,
+    "timeout": 5.0,
+    "max_redirects": 20,
+    "pool_limits": httpx.PoolLimits(soft_limit=10, hard_limit=100),
     "trust_env": True,
     "proxies": None,
     "auth": None,
