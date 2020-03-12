@@ -71,7 +71,7 @@ async def test_item_base_file_dump_pipeline():
 
 @pytest.mark.asyncio
 async def test_item_json_dump_pipeline(item_cls):
-    pl = pls.ItemJsonDumpPipeline(to_dict=lambda x: x)
+    pl = pls.ItemJsonDumpPipeline(to_dict=lambda x: x.__dict__)
     item = item_cls()
     item.count = 1
     assert pl.process(item) is item
