@@ -8,7 +8,6 @@ import re
 
 import aiofiles
 from httpx import Request, Response
-from httpx.models import USER_AGENT
 
 from .items import Item, set_value, get_value
 from .exceptions import Dropped
@@ -68,8 +67,7 @@ class RequestUserAgentPipeline(Pipeline):
         self.user_agent = user_agent
 
     def process(self, obj: Request) -> Request:
-        if obj.headers.get("user-agent") == USER_AGENT:
-            obj.headers["user-agent"] = self.user_agent
+        obj.headers["user-agent"] = self.user_agent
         return obj
 
 
@@ -164,8 +162,7 @@ class RequestRandomUserAgentPipeline(Pipeline):
         )
 
     def process(self, obj: Request) -> Request:
-        if obj.headers.get("user-agent") == USER_AGENT:
-            obj.headers["user-agent"] = self.create()
+        obj.headers["user-agent"] = self.create()
         return obj
 
 
