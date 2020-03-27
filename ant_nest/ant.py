@@ -1,7 +1,6 @@
 import os
 import sys
 import typing
-import asyncio
 import abc
 import itertools
 import logging
@@ -31,9 +30,8 @@ class Ant(abc.ABC):
     request_pipelines: typing.List[Pipeline] = []
     item_pipelines: typing.List[Pipeline] = []
 
-    def __init__(self, loop: typing.Optional[asyncio.AbstractEventLoop] = None):
+    def __init__(self):
         self._start_time = time.time()
-        self.loop = loop if loop is not None else asyncio.get_event_loop()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = httpx.AsyncClient(**settings.HTTPX_CONFIG)
         self.pool = Pool(**settings.POOL_CONFIG)

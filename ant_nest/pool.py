@@ -16,8 +16,8 @@ class Pool:
         self._loop = asyncio.get_event_loop()
         self._limit = limit
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._pending_queue: Queue = Queue(loop=self._loop)
-        self._done_queue: Queue = Queue(loop=self._loop)
+        self._pending_queue: Queue = Queue()
+        self._done_queue: Queue = Queue()
         self._running_count = 0
         self._closed = False
 
@@ -75,7 +75,7 @@ class Pool:
         this "limit" is not shared with pool`s limit
         """
         coros = iter(coros)
-        queue: Queue = Queue(loop=self._loop)
+        queue: Queue = Queue()
         todo: typing.List[asyncio.Future] = []
 
         def _done_callback(f):
