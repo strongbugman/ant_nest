@@ -20,10 +20,11 @@ def retry(
 
 
 async def run_cor_func(func: typing.Callable, *args, **kwargs) -> typing.Any:
-    if asyncio.iscoroutinefunction(func):
-        return await func(*args, **kwargs)
-    else:
-        return func(*args, **kwargs)
+    ret = func(*args, **kwargs)
+    if asyncio.iscoroutine(ret):
+        ret = await ret
+
+    return ret
 
 
 @contextmanager
