@@ -51,7 +51,7 @@ class Ant(abc.ABC):
         params: httpx._models.QueryParamTypes = None,
         headers: httpx._models.HeaderTypes = None,
         cookies: httpx._models.CookieTypes = None,
-        auth: httpx._auth.AuthTypes = None,
+        auth: httpx._auth.Auth = None,
         stream: bool = False,
     ) -> httpx.Response:
         request: httpx.Request = self.client.build_request(
