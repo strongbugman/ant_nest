@@ -15,7 +15,7 @@ ANT_ENV = os.getenv("ANT_ENV", "development")
 HTTPX_CONFIG = {
     "timeout": 5.0,
     "max_redirects": 20,
-    "pool_limits": httpx.PoolLimits(soft_limit=10, hard_limit=100),
+    "limits": httpx.Limits(max_connections=10, max_keepalive_connections=2),
     "trust_env": True,
     "proxies": None,
     "auth": None,
