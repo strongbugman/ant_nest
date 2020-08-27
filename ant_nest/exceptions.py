@@ -14,8 +14,7 @@ class ItemGetValueError(Exception):
 
 
 class ExceptionFilter(logging.Filter):
-    """A exception log filter class for logging.
-    """
+    """A exception log filter class for logging."""
 
     def __init__(
         self,

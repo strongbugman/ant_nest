@@ -8,8 +8,7 @@ from .exceptions import ItemGetValueError
 
 
 class CustomNoneType:
-    """Different with "None" obj ("null" in json)
-    """
+    """Different with "None" obj ("null" in json)"""
 
     pass
 

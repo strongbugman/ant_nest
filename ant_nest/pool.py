@@ -66,7 +66,9 @@ class Pool:
         await self.wait_done()  # wait again avoid concurrent competition
 
     def as_completed(
-        self, coros: typing.Iterable[typing.Awaitable], limit: int = 50,
+        self,
+        coros: typing.Iterable[typing.Awaitable],
+        limit: int = 50,
     ) -> typing.Generator[typing.Awaitable, None, None]:
         """Like "asyncio.as_completed",
         run and iter coros out of pool.
@@ -111,8 +113,7 @@ class Pool:
         limit: int = 50,
         raise_exception: bool = True,
     ) -> typing.AsyncGenerator[typing.Any, None]:
-        """as_completed`s async version, can catch and log exception inside.
-        """
+        """as_completed`s async version, can catch and log exception inside."""
         for coro in self.as_completed(coros, limit=limit):
             try:
                 yield await coro

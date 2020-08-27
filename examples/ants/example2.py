@@ -19,10 +19,12 @@ class GithubAnt(Ant):
         super().__init__()
         self.item_extractor = Extractor(dict)
         self.item_extractor.add_extractor(
-            "title", lambda x: html.fromstring(x.text).xpath("//h1/strong/a/text()")[0],
+            "title",
+            lambda x: html.fromstring(x.text).xpath("//h1/strong/a/text()")[0],
         )
         self.item_extractor.add_extractor(
-            "author", lambda x: html.fromstring(x.text).xpath("//h1/span/a/text()")[0],
+            "author",
+            lambda x: html.fromstring(x.text).xpath("//h1/span/a/text()")[0],
         )
         self.item_extractor.add_extractor(
             "meta_content",
