@@ -234,7 +234,7 @@ class ItemBaseFileDumpPipeline(Pipeline):
                 "The type {:s} is not supported".format(type(data).__class__.__name__)
             )
 
-        async with aiofiles.open(file_path, file_mode) as file:
+        async with aiofiles.open(file_path, file_mode) as file:  # type: ignore
             if chunk is not None:  # in streaming
                 await file.write(chunk)
                 while True:
