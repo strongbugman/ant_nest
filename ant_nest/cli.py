@@ -11,11 +11,12 @@ from pkgutil import iter_modules
 import signal
 import functools
 import fnmatch
+import pkg_resources
 
 import IPython
 
 from .ant import Ant, CliAnt
-from . import __version__
+
 
 __signal_count = 0
 
@@ -77,15 +78,17 @@ def main(args=None):
     args = parser.parse_args(args)
     sys.path.append(os.getcwd())
 
+    version = pkg_resources.get_distribution("ant_nest").version
+
     if args.version:
-        print(__version__)
+        print(version)
         exit()
     elif args.url:
         cli_ant = CliAnt()
         res = asyncio.get_event_loop().run_until_complete(cli_ant.request(args.url))
         objs = {"res": res, "cli_ant": cli_ant}
         IPython.embed(
-            header=f"AntNest-{__version__}\nAvaliable objects:\n"
+            header=f"AntNest-{version}\nAvaliable objects:\n"
             + "\n".join([f"{name}\t{objs[name]}" for name in objs]),
             using="asyncio",
         )
