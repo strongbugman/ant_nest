@@ -1,6 +1,6 @@
 all: test
 
-version=`python -c 'import ant_nest; print(ant_nest.__version__)'`
+version = `python -c 'import pkg_resources; print(pkg_resources.get_distribution("ant_nest").version)'`
 
 prepare_test_env:
 	docker run --name test_httpbin --rm -d -p 8080:80 kennethreitz/httpbin@sha256:ebfa1bd104bc80c4da84da4a2a3abfb0dbd82d7bb536bb51000c1b330d8dc34f
@@ -8,21 +8,23 @@ prepare_test_env:
 destroy_test_env:
 	docker stop test_httpbin
 
-test:
-	black ant_nest tests examples setup.py --check
-	flake8 ant_nest tests examples setup.py
-	mypy --ignore-missing-imports ant_nest
-	python setup.py test --addopts='--cov ant_nest --cov-report term-missing'
-	python setup.py install && cd examples && pip install -r requirements.txt && ant_nest -a "*" && cd ../
+install:
+	poetry install
 
-tag:
+test: install
+	black ant_nest tests examples --check
+	flake8 ant_nest tests examples
+	mypy --ignore-missing-imports ant_nest
+	pytest --cov ant_nest --cov-report term-missing
+
+integration_test: install
+	cd examples && ant_nest -a "*" && cd ../
+
+tag: install
 	git tag $(version) -m "Release of version $(version)"
 
-sdist:
-	./setup.py sdist
-
-pypi_release:
-	./setup.py sdist upload -r pypi
+pypi_release: install
+	poetry publish
 
 github_release:
 	git push origin --tags
