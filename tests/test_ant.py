@@ -85,7 +85,7 @@ async def test_pipelines():
 
 @pytest.mark.asyncio
 async def test_with_real_send():
-    httpbin_base_url = os.getenv("TEST_HTTPBIN", "http://localhost:8080/")
+    httpbin_base_url = os.getenv("TEST_HTTPBIN", "http://docker-server:8081/")
 
     ant = CliAnt()
     res = await ant.request(httpbin_base_url)

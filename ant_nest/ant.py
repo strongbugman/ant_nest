@@ -7,11 +7,11 @@ import logging
 import time
 
 import httpx
+from oxalis.pool import Pool
 
 from .pipelines import Pipeline
 from .items import Item
 from .exceptions import Dropped
-from .pool import Pool
 from .reporter import Reporter
 from . import utils
 

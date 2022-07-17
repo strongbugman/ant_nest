@@ -25,9 +25,7 @@ HTTPX_CONFIG = {
 }
 
 
-POOL_CONFIG = {
-    "limit": 100,
-}
+POOL_CONFIG = {"limit": 100, "timeout": 60}
 REPORTER = {
     "slot": 60,
 }

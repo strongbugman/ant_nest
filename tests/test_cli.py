@@ -17,14 +17,14 @@ def test_cli_get_ants():
 def test_cli_shutdown():
     ant = CliAnt()
     cli.shutdown_ant([ant])
-    assert ant.pool.closed
+    assert not ant.pool.running
 
     with pytest.raises(SystemExit):
         cli.shutdown_ant([ant])
 
 
 def test_cli():
-    httpbin_base_url = os.getenv("TEST_HTTPBIN", "http://localhost:8080/")
+    httpbin_base_url = os.getenv("TEST_HTTPBIN", "http://docker-server:8081/")
 
     with pytest.raises(SystemExit):
         cli.main(["-v"])

@@ -56,6 +56,8 @@ def shutdown_ant(ants: typing.List[Ant]):
             "Receive shutdown command twice, ant {:s} shutdown "
             "immediately".format(ant_names)
         )
+        for ant in ants:
+            ant.pool.fore_close()
         sys.exit()
     __signal_count += 1
 
@@ -63,7 +65,7 @@ def shutdown_ant(ants: typing.List[Ant]):
 
     # close coroutine pool
     for ant in ants:
-        ant.pool.close()
+        ant.pool.running = False
 
 
 def main(args=None):
