@@ -20,30 +20,30 @@ class GithubAnt(Ant):
         self.item_extractor = Extractor(dict)
         self.item_extractor.add_extractor(
             "title",
-            lambda x: html.fromstring(x.text).xpath("//h1/strong/a/text()")[0],
+            lambda x: html.fromstring(x.text).xpath("/html/body/div[4]/div/main/div/div[1]/div/div/strong/a/text()")[0],
         )
         self.item_extractor.add_extractor(
             "author",
-            lambda x: html.fromstring(x.text).xpath("//h1/span/a/text()")[0],
+            lambda x: html.fromstring(x.text).xpath("/html/body/div[4]/div/main/div/div[1]/div/div/span[1]/a/text()")[0],
         )
         self.item_extractor.add_extractor(
             "meta_content",
             lambda x: "".join(
                 html.fromstring(x.text).xpath(
-                    '//div[@class="repository-content "]/div[2]//text()'
+                    '/html/body/div[4]/div/main/turbo-frame/div/div/div/div[3]/div[2]/div/div[1]/div/p/text()'
                 )
             ),
         )
         self.item_extractor.add_extractor(
             "star",
             lambda x: html.fromstring(x.text).xpath(
-                '//a[@class="social-count js-social-count"]/text()'
+                '//span[@id="repo-stars-counter-star"]/text()'
             )[0],
         )
         self.item_extractor.add_extractor(
             "fork",
             lambda x: html.fromstring(x.text).xpath(
-                '//a[@class="social-count"]/text()'
+                '//span[@id="repo-network-counter"]/text()'
             )[0],
         )
         self.item_extractor.add_extractor("origin_url", lambda x: str(x.url))
