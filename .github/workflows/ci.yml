@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version:
+          - '3.6'
+          - '3.7'
+          - '3.8'
+    env:
+      TEST_HOST: TRAVIS
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: sudo /etc/init.d/mysql stop
+      - run: make prepare_test_env
+      - run: pip install poetry
+      - run: poetry config virtualenvs.create false --local
+      - run: poetry update
+      - run: make test
+      - run: make integration_test
+      - run: make destroy_test_env
+      - run: codecov
