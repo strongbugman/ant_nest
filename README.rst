@@ -224,7 +224,28 @@ concurrent limit("connection_limit" or "concurrent_limit") simply, but it`s comp
 Coding style
 ============
 
-Follow "Flake8", Format by "Black", typing check by "MyPy", sea Makefile for more detail.
+Follow "Flake8", Format by "Black", typing check by "MyPy", see Makefile for more detail.
+
+
+Recommended Service
+===================
+ 
+.. note::
+ 
+   This section contains an **affiliate link**. Signing up through it may earn
+   ant_nest a commission at no extra cost to you, which helps support the
+   project's maintenance.
+ 
+If you need to scrape JavaScript-heavy sites or keep running into blocks,
+`ScrapingAnt <https://scrapingant.com/?ref=nzvkzmy`
+is worth a look. It handles headless-browser rendering, proxy rotation, and
+CAPTCHA avoidance behind a single API call, and works cleanly under the async
+HTTP clients that ``ant_nest`` is built around — so you can focus on parsing
+instead of fighting anti-bot measures.
+ 
+For low-volume scraping of static pages, plain ``ant_nest`` is already enough;
+ScrapingAnt mainly earns its keep when rendering and proxies become a hassle.
+ 
 
 
 Todo
